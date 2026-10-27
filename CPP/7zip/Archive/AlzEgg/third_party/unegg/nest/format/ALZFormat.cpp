@@ -17,6 +17,7 @@
 #include <nest/encryption/ZipDecoder.h>
 #include <nest/algorithm/crc32.hpp>
 #include <nest/Utils.h>
+#include <vector>
 
 namespace nest
 {
@@ -539,9 +540,9 @@ int ALZFormat::ExtractIndividualFile(size_t index, OutputStream* stream)
 
                 if (info.coder)
                 {
-                    unsigned char dataHeader[info.dataHeaderSize];
-                    istream_.Read(dataHeader, info.dataHeaderSize);
-                    res = info.coder->Initialize(dataHeader, info.dataHeaderSize);
+                    std::vector<unsigned char> dataHeader(info.dataHeaderSize);
+                    istream_.Read(dataHeader.data(), info.dataHeaderSize);
+                    res = info.coder->Initialize(dataHeader.data(), info.dataHeaderSize);
 
                     res = OnProgress(index, 0, PROGRESS_MAX);
 
