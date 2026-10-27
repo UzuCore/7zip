@@ -162,7 +162,8 @@ class CHandlerEvents: public nest::Events
   CHandler *_owner;
 
 public:
-  explicit CHandlerEvents(CHandler *owner): _owner(owner) {}
+  CHandlerEvents(): _owner(NULL) {}
+  void SetOwner(CHandler *owner) { _owner = owner; }
 
   int Initialize(nest::Workspace *) override;
   void Finalize(int) override;
@@ -247,8 +248,11 @@ Z7_CLASS_IMP_CHandler_IInArchive_1(IOutArchive)
   }
 
 public:
-  explicit CHandler(bool isEgg = false): _events(this), _isEgg(isEgg), _isSolid(false), _testMode(false), _askMode(0),
-      _itemCount(0), _callbackResult(S_OK), _selectedTotal(0) {}
+  explicit CHandler(bool isEgg = false): _isEgg(isEgg), _isSolid(false), _testMode(false), _askMode(0),
+      _itemCount(0), _callbackResult(S_OK), _selectedTotal(0)
+  {
+    _events.SetOwner(this);
+  }
 
   ~CHandler()
   {
@@ -626,7 +630,13 @@ public:
 
   FILE *Create()
   {
-    FILE *file = tmpfile();
+    FILE *file = NULL;
+#if defined(_MSC_VER)
+    if (tmpfile_s(&file) != 0)
+      return NULL;
+#else
+    file = tmpfile();
+#endif
     if (file)
       _files.push_back(file);
     return file;
