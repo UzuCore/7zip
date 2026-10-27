@@ -77,7 +77,8 @@ void CApp::SetListSettings()
 
   ShowSystemMenu = st.ShowSystemMenu;
 
-  DWORD extendedStyle = LVS_EX_HEADERDRAGDROP;
+  // Keep rapid list updates smooth and reveal names clipped by narrow columns.
+  DWORD extendedStyle = LVS_EX_HEADERDRAGDROP | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP;
   if (st.FullRow)
     extendedStyle |= LVS_EX_FULLROWSELECT;
   if (st.ShowGrid)

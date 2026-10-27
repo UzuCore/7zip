@@ -100,6 +100,7 @@ AR_OBJS = \
   $O/ApmHandler.o \
   $O/ArHandler.o \
   $O/ArjHandler.o \
+  $O/AlzEggHandler.o \
   $O/Base64Handler.o \
   $O/Bz2Handler.o \
   $O/ComHandler.o \

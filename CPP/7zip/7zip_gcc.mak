@@ -506,6 +506,9 @@ $O/ArHandler.o: ../../Archive/ArHandler.cpp
 	$(CXX) $(CXXFLAGS) $<
 $O/ArjHandler.o: ../../Archive/ArjHandler.cpp
 	$(CXX) $(CXXFLAGS) $<
+
+$O/AlzEggHandler.o: ../../Archive/AlzEggHandler.cpp
+	$(CXX) $(CXXFLAGS) $<
 $O/AvbHandler.o: ../../Archive/AvbHandler.cpp
 	$(CXX) $(CXXFLAGS) $<
 $O/Base64Handler.o: ../../Archive/Base64Handler.cpp

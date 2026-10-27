@@ -3,6 +3,8 @@ PROG = 7z.dll
 DEF_FILE = ../../Archive/Archive2.def
 CFLAGS = $(CFLAGS) \
   -DZ7_EXTERNAL_CODECS \
+  /I..\..\Archive\AlzEgg\third_party\unegg
+LIBS = $(LIBS) ..\..\Archive\AlzEgg\third_party\unegg\build\UnEggBackend.lib
 
 !IFNDEF UNDER_CE
 !ENDIF

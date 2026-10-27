@@ -3,6 +3,8 @@ PROG = 7zz.exe
 # USE_C_SHA = 1
 
 CFLAGS = $(CFLAGS) -DZ7_PROG_VARIANT_Z
+CFLAGS = $(CFLAGS) /I..\..\Archive\AlzEgg\third_party\unegg
+LIBS = $(LIBS) ..\..\Archive\AlzEgg\third_party\unegg\build\UnEggBackend.lib
 # CONSOLE_VARIANT_FLAGS=-DZ7_PROG_VARIANT_Z
 
 !include "../Format7zF/Arc.mak"

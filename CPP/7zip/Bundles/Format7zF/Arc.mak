@@ -63,6 +63,7 @@ AR_OBJS = \
   $O\ApmHandler.obj \
   $O\ArHandler.obj \
   $O\ArjHandler.obj \
+  $O\AlzEggHandler.obj \
   $O\Base64Handler.obj \
   $O\Bz2Handler.obj \
   $O\ComHandler.obj \

@@ -105,4 +105,7 @@ OBJS = \
   $(UI_COMMON_OBJS) \
   $(CONSOLE_OBJS) \
 
+CXX_INCLUDE_FLAGS += -I../../Archive/AlzEgg/third_party/unegg
+MY_LIBS += ../../Archive/AlzEgg/third_party/unegg/build/libUnEggBackend.a
+
 include ../../7zip_gcc.mak
