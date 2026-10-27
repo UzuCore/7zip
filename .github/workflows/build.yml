@@ -241,19 +241,74 @@ jobs:
         run: |
           release_date="$(TZ=Asia/Seoul date +%Y.%m.%d)"
           release_title_date="$(TZ=Asia/Seoul date +%Y-%m-%d)"
+          echo "date=${release_title_date}" >> "$GITHUB_OUTPUT"
           echo "tag=build-${release_date}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "title=7-Zip ${release_title_date} (build #${GITHUB_RUN_NUMBER})" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub Release
+        uses: actions/github-script@v9
         env:
-          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release-meta.outputs.tag }}
           RELEASE_TITLE: ${{ steps.release-meta.outputs.title }}
-        run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" release/*.zip --clobber
-          else
-            gh release create "$RELEASE_TAG" release/*.zip \
-              --title "$RELEASE_TITLE" \
-              --notes "Automatic build for $(TZ=Asia/Seoul date +%Y-%m-%d)."
-          fi
+          RELEASE_DATE: ${{ steps.release-meta.outputs.date }}
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const { owner, repo } = context.repo;
+            const tag = process.env.RELEASE_TAG;
+            const files = fs.readdirSync("release").filter((file) => file.endsWith(".zip")).sort();
+
+            if (files.length !== 6) {
+              throw new Error(`Expected 6 release archives, found ${files.length}: ${files.join(", ")}`);
+            }
+
+            let release;
+            try {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({ owner, repo, tag }));
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              ({ data: release } = await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tag,
+                target_commitish: context.sha,
+                name: process.env.RELEASE_TITLE,
+                body: `Automated build for ${process.env.RELEASE_DATE}.`,
+                draft: false,
+                prerelease: false,
+              }));
+            }
+
+            const existingAssets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              owner,
+              repo,
+              release_id: release.id,
+              per_page: 100,
+            });
+
+            for (const file of files) {
+              const existing = existingAssets.find((asset) => asset.name === file);
+              if (existing) {
+                await github.rest.repos.deleteReleaseAsset({
+                  owner,
+                  repo,
+                  asset_id: existing.id,
+                });
+              }
+
+              const filePath = path.join("release", file);
+              const data = fs.readFileSync(filePath);
+              await github.rest.repos.uploadReleaseAsset({
+                owner,
+                repo,
+                release_id: release.id,
+                name: file,
+                data,
+                headers: {
+                  "content-type": "application/zip",
+                  "content-length": data.length,
+                },
+              });
+              console.log(`Uploaded ${file}`);
+            }
