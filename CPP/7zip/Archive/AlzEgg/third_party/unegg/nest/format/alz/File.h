@@ -67,7 +67,7 @@ public:
 
     inline unsigned short GetCompressMethod()
     {
-        return compressMethod_ == 2 ? CompressionMethod::Deflate : CompressionMethod::Store;
+        return static_cast<unsigned short>(compressMethod_ == 2 ? CompressionMethod::Deflate : CompressionMethod::Store);
     }
 
     inline unsigned int GetCRC()
