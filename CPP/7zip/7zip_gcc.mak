@@ -161,7 +161,7 @@ DEL_OBJ_EXE = -$(RM) $(PROGPATH) $(PROGPATH_STATIC) $(OBJS)
 # LOCAL_LIBS=-lpthread
 # LOCAL_LIBS_DLL=$(LOCAL_LIBS) -ldl
 ifeq ($(shell uname -s),Darwin)
-LIB2 = -lpthread
+LIB2 = -lpthread -liconv
 else
 LIB2 = -lpthread -ldl
 endif
