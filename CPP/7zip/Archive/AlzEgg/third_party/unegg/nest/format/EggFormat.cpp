@@ -439,9 +439,9 @@ int EggFormat::PrepareSolidBlock(egg::BlockWrap* block, BlockExtractInfo* info)
 
     if (info->coder)
     {
-        unsigned char dataHeader[info->dataHeaderSize];
-        istream_.Read(dataHeader, info->dataHeaderSize);
-        res = info->coder->Initialize(dataHeader, info->dataHeaderSize);
+        std::vector<unsigned char> dataHeader(info->dataHeaderSize);
+        istream_.Read(dataHeader.data(), info->dataHeaderSize);
+        res = info->coder->Initialize(dataHeader.data(), info->dataHeaderSize);
     }
     else
     {
@@ -780,9 +780,9 @@ int EggFormat::ExtractIndividualFile(size_t index, OutputStream* stream)
 
                         if (info.coder)
                         {
-                            unsigned char dataHeader[info.dataHeaderSize];
-                            istream_.Read(dataHeader, info.dataHeaderSize);
-                            res = info.coder->Initialize(dataHeader, info.dataHeaderSize);
+                            std::vector<unsigned char> dataHeader(info.dataHeaderSize);
+                            istream_.Read(dataHeader.data(), info.dataHeaderSize);
+                            res = info.coder->Initialize(dataHeader.data(), info.dataHeaderSize);
 
                             res = OnProgress(index, 0, PROGRESS_MAX);
 

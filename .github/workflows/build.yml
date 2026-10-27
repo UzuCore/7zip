@@ -119,7 +119,14 @@ jobs:
           if ($buildExitCode -ne 0) {
             "Windows $env:BUILD_ARCH build failed with exit code $buildExitCode. Last build output:" | Add-Content $env:GITHUB_STEP_SUMMARY
             Get-Content -LiteralPath $buildLog -Tail 120 | Add-Content $env:GITHUB_STEP_SUMMARY
-            $details = (Get-Content -LiteralPath $buildLog -Tail 60) -join "`n"
+            $failureLines = Select-String -Path $buildLog -Pattern 'error [A-Z]+\d+|fatal error|: error:|LNK\d+|Undefined symbols for architecture|ld: ' | Select-Object -Last 12 | ForEach-Object { $_.Line }
+            if (-not $failureLines) {
+              $failureLines = Get-Content -LiteralPath $buildLog -Tail 8
+            }
+            $details = ($failureLines -join "`n")
+            if ($details.Length -gt 2400) {
+              $details = $details.Substring(0, 2400)
+            }
             $details = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
             Write-Output "::error title=Windows build output::$details"
             throw "Windows $env:BUILD_ARCH build failed with exit code $buildExitCode."
@@ -171,7 +178,11 @@ jobs:
             exit 0
           else
             build_status=${PIPESTATUS[0]}
-            build_details=$(tail -n 60 "$build_log")
+            build_details=$(grep -E 'error [A-Z]+[0-9]+|fatal error|: error:|Undefined symbols for architecture|ld: ' "$build_log" | tail -n 12 || true)
+            if [[ -z "$build_details" ]]; then
+              build_details=$(tail -n 8 "$build_log")
+            fi
+            build_details=${build_details:0:2400}
             build_details=${build_details//'%'/'%25'}
             build_details=${build_details//$'\r'/'%0D'}
             build_details=${build_details//$'\n'/'%0A'}
