@@ -209,3 +209,51 @@ jobs:
           path: dist/macos-${{ matrix.arch }}/
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publish date-based release
+    if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs:
+      - linux
+      - windows
+      - macos
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: 7zip-*
+          path: release-assets
+
+      - name: Package release assets
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          for artifact_dir in release-assets/7zip-*; do
+            asset_name="${artifact_dir##*/}"
+            (cd "$artifact_dir" && zip -q -r "$GITHUB_WORKSPACE/release/${asset_name}.zip" .)
+          done
+
+      - name: Generate date-based release metadata
+        id: release-meta
+        run: |
+          release_date="$(TZ=Asia/Seoul date +%Y.%m.%d)"
+          release_title_date="$(TZ=Asia/Seoul date +%Y-%m-%d)"
+          echo "tag=build-${release_date}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "title=7-Zip ${release_title_date} (build #${GITHUB_RUN_NUMBER})" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release-meta.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.release-meta.outputs.title }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release/*.zip --clobber
+          else
+            gh release create "$RELEASE_TAG" release/*.zip \
+              --title "$RELEASE_TITLE" \
+              --notes "Automatic build for $(TZ=Asia/Seoul date +%Y-%m-%d)."
+          fi
