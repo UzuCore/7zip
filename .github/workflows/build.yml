@@ -20,7 +20,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
 
-      - name: Build ALZ and EGG decoder
+      - name: Build UnEGG backend
         run: |
           cmake -S CPP/7zip/Archive/AlzEgg/third_party/unegg -B CPP/7zip/Archive/AlzEgg/third_party/unegg/build -DCMAKE_BUILD_TYPE=Release
           cmake --build CPP/7zip/Archive/AlzEgg/third_party/unegg/build --parallel 2
@@ -92,9 +92,13 @@ jobs:
           '@
           [IO.File]::WriteAllText($buildScript, $scriptText, [Text.Encoding]::ASCII)
 
-          & $env:ComSpec /d /c $buildScript
-          if ($LASTEXITCODE -ne 0) {
-            throw "Windows build failed with exit code $LASTEXITCODE."
+          $buildLog = Join-Path $env:RUNNER_TEMP 'build-7zip-x64.log'
+          & $env:ComSpec /d /c $buildScript 2>&1 | Tee-Object -FilePath $buildLog
+          $buildExitCode = $LASTEXITCODE
+          if ($buildExitCode -ne 0) {
+            "Windows build failed with exit code $buildExitCode. Last build output:" | Add-Content $env:GITHUB_STEP_SUMMARY
+            Get-Content -LiteralPath $buildLog -Tail 120 | Add-Content $env:GITHUB_STEP_SUMMARY
+            throw "Windows build failed with exit code $buildExitCode."
           }
 
           $artifactDir = Join-Path $env:GITHUB_WORKSPACE 'dist\windows-x64'
@@ -112,5 +116,44 @@ jobs:
         with:
           name: 7zip-windows-x64
           path: dist/windows-x64/
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Build UnEGG backend
+        run: |
+          cmake -S CPP/7zip/Archive/AlzEgg/third_party/unegg -B CPP/7zip/Archive/AlzEgg/third_party/unegg/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build CPP/7zip/Archive/AlzEgg/third_party/unegg/build --parallel 2
+
+      - name: Build 7zz
+        run: make -j2 -f makefile.gcc
+        working-directory: CPP/7zip/Bundles/Alone2
+
+      - name: Stage build artifact
+        run: |
+          mkdir -p "dist/macos-${{ matrix.arch }}"
+          cp CPP/7zip/Bundles/Alone2/_o/7zz "dist/macos-${{ matrix.arch }}/"
+          cp DOC/License.txt DOC/copying.txt DOC/unRarLicense.txt "dist/macos-${{ matrix.arch }}/"
+          cp CPP/7zip/Archive/AlzEgg/third_party/unegg/LICENSE.txt "dist/macos-${{ matrix.arch }}/UnEGG-LICENSE.txt"
+
+      - name: Upload macOS build
+        uses: actions/upload-artifact@v7
+        with:
+          name: 7zip-macos-${{ matrix.arch }}
+          path: dist/macos-${{ matrix.arch }}/
           if-no-files-found: error
           retention-days: 14
