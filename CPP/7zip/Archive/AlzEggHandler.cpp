@@ -12,7 +12,9 @@
 #include "../Common/ProgressUtils.h"
 #include "../Common/RegisterArc.h"
 #include "../Common/StreamUtils.h"
+#include "../Compress/DeflateEncoder.h"
 #include "IArchive.h"
+#include "../../../C/7zCrc.h"
 
 #include "AlzEgg/third_party/unegg/nest/Events.h"
 #include "AlzEgg/third_party/unegg/nest/Info.h"
@@ -22,6 +24,7 @@
 #include "AlzEgg/third_party/unegg/nest/stream/OutputStream.h"
 
 #include <memory>
+#include <stdio.h>
 #include <vector>
 #include <string.h>
 
@@ -174,7 +177,7 @@ public:
   int OnProgress(size_t index, int current, int max) override;
 };
 
-Z7_CLASS_IMP_CHandler_IInArchive_0
+Z7_CLASS_IMP_CHandler_IInArchive_1(IOutArchive)
 
   friend class CHandlerEvents;
 
@@ -244,7 +247,7 @@ Z7_CLASS_IMP_CHandler_IInArchive_0
   }
 
 public:
-  CHandler(): _events(this), _isEgg(false), _isSolid(false), _testMode(false), _askMode(0),
+  explicit CHandler(bool isEgg = false): _events(this), _isEgg(isEgg), _isSolid(false), _testMode(false), _askMode(0),
       _itemCount(0), _callbackResult(S_OK), _selectedTotal(0) {}
 
   ~CHandler()
@@ -578,6 +581,490 @@ HRESULT CHandler::Extract(const UInt32 *indices, UInt32 numItems, Int32 testMode
   COM_TRY_END
 }
 
+namespace
+{
+
+struct CWriteBlock
+{
+  UInt32 Size;
+  UInt32 CRC;
+  UInt32 Method;
+  UInt32 PackedSize;
+  FILE *PackedData;
+
+  CWriteBlock(): Size(0), CRC(0), Method(0), PackedSize(0), PackedData(NULL) {}
+};
+
+struct CWriteItem
+{
+  std::string Name;
+  bool IsDir;
+  UInt64 Size;
+  UInt64 MTime;
+  UInt32 DosTime;
+  UInt32 CRC;
+  UInt32 Method;
+  UInt64 PackedSize;
+  FILE *Data;
+  FILE *PackedData;
+  std::vector<CWriteBlock> Blocks;
+
+  CWriteItem(): IsDir(false), Size(0), MTime(0), DosTime(0x00210000), CRC(0), Method(0),
+      PackedSize(0), Data(NULL), PackedData(NULL) {}
+};
+
+class CTempFiles
+{
+  std::vector<FILE *> _files;
+public:
+  ~CTempFiles()
+  {
+    for (size_t i = 0; i < _files.size(); ++i)
+      if (_files[i])
+        fclose(_files[i]);
+  }
+
+  FILE *Create()
+  {
+    FILE *file = tmpfile();
+    if (file)
+      _files.push_back(file);
+    return file;
+  }
+};
+
+Z7_CLASS_IMP_NOQIB_1(CTempFileInStream, ISequentialInStream)
+  FILE *_file;
+  UInt64 _remaining;
+public:
+  void Init(FILE *file, UInt64 size) { _file = file; _remaining = size; }
+};
+
+Z7_CLASS_IMP_NOQIB_1(CTempFileOutStream, ISequentialOutStream)
+  FILE *_file;
+  UInt64 _size;
+public:
+  void Init(FILE *file) { _file = file; _size = 0; }
+  UInt64 GetSize() const { return _size; }
+};
+
+Z7_COM7F_IMF(CTempFileInStream::Read(void *data, UInt32 size, UInt32 *processedSize))
+{
+  *processedSize = 0;
+  if (_remaining == 0 || size == 0)
+    return S_OK;
+  const size_t request = (_remaining > size) ? size : (size_t)_remaining;
+  const size_t processed = fread(data, 1, request, _file);
+  if (processed == 0 && ferror(_file))
+    return E_FAIL;
+  _remaining -= processed;
+  *processedSize = (UInt32)processed;
+  return S_OK;
+}
+
+Z7_COM7F_IMF(CTempFileOutStream::Write(const void *data, UInt32 size, UInt32 *processedSize))
+{
+  *processedSize = 0;
+  if (size == 0)
+    return S_OK;
+  const size_t processed = fwrite(data, 1, size, _file);
+  if (processed != size)
+    return E_FAIL;
+  _size += processed;
+  *processedSize = (UInt32)processed;
+  return S_OK;
+}
+
+static HRESULT WriteBytes(ISequentialOutStream *stream, const void *data, UInt32 size)
+{
+  return WriteStream(stream, data, size);
+}
+
+static HRESULT WriteByte(ISequentialOutStream *stream, Byte value)
+{
+  return WriteBytes(stream, &value, 1);
+}
+
+static HRESULT WriteUInt16(ISequentialOutStream *stream, UInt16 value)
+{
+  const Byte bytes[2] = { (Byte)value, (Byte)(value >> 8) };
+  return WriteBytes(stream, bytes, sizeof(bytes));
+}
+
+static HRESULT WriteUInt32(ISequentialOutStream *stream, UInt32 value)
+{
+  const Byte bytes[4] =
+  {
+    (Byte)value, (Byte)(value >> 8), (Byte)(value >> 16), (Byte)(value >> 24)
+  };
+  return WriteBytes(stream, bytes, sizeof(bytes));
+}
+
+static HRESULT WriteUInt64(ISequentialOutStream *stream, UInt64 value)
+{
+  Byte bytes[8];
+  for (unsigned i = 0; i < 8; ++i)
+    bytes[i] = (Byte)(value >> (i * 8));
+  return WriteBytes(stream, bytes, sizeof(bytes));
+}
+
+static HRESULT WriteTempBytes(FILE *file, UInt64 size, ISequentialOutStream *stream)
+{
+  Byte buffer[1 << 16];
+  while (size != 0)
+  {
+    const size_t request = (size > sizeof(buffer)) ? sizeof(buffer) : (size_t)size;
+    const size_t processed = fread(buffer, 1, request, file);
+    if (processed == 0)
+      return E_FAIL;
+    RINOK(WriteBytes(stream, buffer, (UInt32)processed))
+    size -= processed;
+  }
+  return S_OK;
+}
+
+static HRESULT CompressTemp(FILE *source, UInt64 sourceSize, CTempFiles &tempFiles,
+    FILE **packedData, UInt64 *packedSize)
+{
+  FILE *packed = tempFiles.Create();
+  if (!packed)
+    return E_FAIL;
+
+  CMyComPtr2_Create<ISequentialInStream, CTempFileInStream> input;
+  input->Init(source, sourceSize);
+  CMyComPtr2_Create<ISequentialOutStream, CTempFileOutStream> output;
+  output->Init(packed);
+  CMyComPtr2_Create<ICompressCoder, NCompress::NDeflate::NEncoder::CCOMCoder> encoder;
+  RINOK(encoder.Interface()->Code(input, output, NULL, NULL, NULL))
+  if (fflush(packed) != 0)
+    return E_FAIL;
+  *packedData = packed;
+  *packedSize = output->GetSize();
+  return S_OK;
+}
+
+static HRESULT ReadAndStageFile(IArchiveUpdateCallback *callback, UInt32 index,
+    CWriteItem &item, CTempFiles &tempFiles, UInt64 &completed,
+    UInt64 eggBlockSize)
+{
+  CMyComPtr<ISequentialInStream> input;
+  RINOK(callback->GetStream(index, &input))
+  if (!input)
+    return item.Size == 0 ? S_OK : E_FAIL;
+
+  FILE *data = tempFiles.Create();
+  if (!data)
+    return E_FAIL;
+  item.Data = data;
+
+  Byte buffer[1 << 16];
+  UInt64 remaining = item.Size;
+  UInt32 fileCRC = CRC_INIT_VAL;
+  UInt32 blockCRC = CRC_INIT_VAL;
+  UInt32 blockSize = 0;
+
+  while (remaining != 0)
+  {
+    const UInt32 request = (UInt32)(remaining > sizeof(buffer) ? sizeof(buffer) : remaining);
+    UInt32 processed = 0;
+    RINOK(input->Read(buffer, request, &processed))
+    if (processed == 0 || processed > request)
+      return E_FAIL;
+    if (fwrite(buffer, 1, processed, data) != processed)
+      return E_FAIL;
+
+    fileCRC = CrcUpdate(fileCRC, buffer, processed);
+    UInt32 offset = 0;
+    while (offset < processed)
+    {
+      const UInt32 room = (UInt32)(eggBlockSize - blockSize);
+      const UInt32 part = (processed - offset < room) ? processed - offset : room;
+      blockCRC = CrcUpdate(blockCRC, buffer + offset, part);
+      blockSize += part;
+      offset += part;
+      if (blockSize == eggBlockSize)
+      {
+        CWriteBlock block;
+        block.Size = blockSize;
+        block.CRC = CRC_GET_DIGEST(blockCRC);
+        item.Blocks.push_back(block);
+        blockSize = 0;
+        blockCRC = CRC_INIT_VAL;
+      }
+    }
+
+    remaining -= processed;
+    completed += processed;
+    RINOK(callback->SetCompleted(&completed))
+  }
+
+  if (blockSize != 0)
+  {
+    CWriteBlock block;
+    block.Size = blockSize;
+    block.CRC = CRC_GET_DIGEST(blockCRC);
+    item.Blocks.push_back(block);
+  }
+  item.CRC = CRC_GET_DIGEST(fileCRC);
+  if (fflush(data) != 0)
+    return E_FAIL;
+  return S_OK;
+}
+
+static HRESULT WriteAlzArchive(ISequentialOutStream *stream,
+    const std::vector<CWriteItem> &items, IArchiveUpdateCallback *callback)
+{
+  RINOK(WriteUInt32(stream, 0x015A4C41)) // ALZ signature
+  RINOK(WriteUInt16(stream, 10))
+  RINOK(WriteUInt16(stream, 0))
+
+  for (UInt32 i = 0; i < items.size(); ++i)
+  {
+    const CWriteItem &item = items[i];
+    RINOK(WriteUInt32(stream, 0x015A4C42)) // file header
+    RINOK(WriteUInt16(stream, (UInt16)item.Name.size()))
+    RINOK(WriteByte(stream, item.IsDir ? 0x10 : 0x20))
+    RINOK(WriteUInt32(stream, item.DosTime))
+    if (item.IsDir)
+    {
+      RINOK(WriteUInt16(stream, 0))
+    }
+    else
+    {
+      RINOK(WriteUInt16(stream, 0x80)) // 8-byte packed and unpacked sizes
+      RINOK(WriteUInt16(stream, (UInt16)item.Method))
+      RINOK(WriteUInt32(stream, item.CRC))
+      RINOK(WriteUInt64(stream, item.Method == 2 ? item.PackedSize : item.Size))
+      RINOK(WriteUInt64(stream, item.Size))
+    }
+    RINOK(WriteBytes(stream, item.Name.data(), (UInt32)item.Name.size()))
+    if (!item.IsDir)
+    {
+      FILE *payload = item.Method == 2 ? item.PackedData : item.Data;
+      if (payload)
+        rewind(payload);
+      RINOK(WriteTempBytes(payload,
+          item.Method == 2 ? item.PackedSize : item.Size, stream))
+    }
+    RINOK(callback->SetOperationResult(NUpdate::NOperationResult::kOK))
+  }
+
+  RINOK(WriteUInt32(stream, 0x015A4C43)) // end marker
+  RINOK(WriteUInt32(stream, 0))
+  RINOK(WriteUInt32(stream, 0))
+  RINOK(WriteUInt32(stream, 0))
+  return S_OK;
+}
+
+static HRESULT WriteEggArchive(ISequentialOutStream *stream,
+    const std::vector<CWriteItem> &items, IArchiveUpdateCallback *callback)
+{
+  static const UInt32 kEnd = 0x08E28222;
+  static const UInt32 kBlock = 0x02B50C13;
+  static const UInt32 kFile = 0x0A8590E3;
+  static const UInt32 kFilename = 0x0A8591AC;
+  static const UInt32 kWindowsInfo = 0x2C86950B;
+
+  RINOK(WriteUInt32(stream, 0x41474745)) // EGGA
+  RINOK(WriteUInt16(stream, 0x0100))
+  RINOK(WriteUInt32(stream, 1))
+  RINOK(WriteUInt32(stream, 0))
+  RINOK(WriteUInt32(stream, kEnd)) // end of archive prefix
+
+  for (UInt32 i = 0; i < items.size(); ++i)
+  {
+    const CWriteItem &item = items[i];
+    RINOK(WriteUInt32(stream, kFile))
+    RINOK(WriteUInt32(stream, i))
+    RINOK(WriteUInt64(stream, item.Size))
+
+    RINOK(WriteUInt32(stream, kFilename))
+    RINOK(WriteByte(stream, 0)) // UTF-8 relative path
+    RINOK(WriteUInt16(stream, (UInt16)item.Name.size()))
+    RINOK(WriteBytes(stream, item.Name.data(), (UInt32)item.Name.size()))
+
+    RINOK(WriteUInt32(stream, kWindowsInfo))
+    RINOK(WriteByte(stream, 0))
+    RINOK(WriteUInt16(stream, 9))
+    RINOK(WriteUInt64(stream, item.MTime))
+    RINOK(WriteByte(stream, item.IsDir ? 0x80 : 0x20))
+    RINOK(WriteUInt32(stream, kEnd)) // end of file sub-headers
+
+    if (!item.IsDir && item.Size != 0)
+    {
+      if (!item.Data)
+        return E_FAIL;
+      rewind(item.Data);
+      for (size_t blockIndex = 0; blockIndex < item.Blocks.size(); ++blockIndex)
+      {
+        const CWriteBlock &block = item.Blocks[blockIndex];
+        const UInt32 packedSize = block.Method == 1 ? block.PackedSize : block.Size;
+        RINOK(WriteUInt32(stream, kBlock))
+        RINOK(WriteByte(stream, (Byte)block.Method))
+        RINOK(WriteByte(stream, 0))
+        RINOK(WriteUInt32(stream, block.Size))
+        RINOK(WriteUInt32(stream, packedSize))
+        RINOK(WriteUInt32(stream, block.CRC))
+        RINOK(WriteUInt32(stream, kEnd))
+        FILE *payload = block.Method == 1 ? block.PackedData : item.Data;
+        if (block.Method == 1 && payload)
+          rewind(payload);
+        RINOK(WriteTempBytes(payload, packedSize, stream))
+      }
+    }
+    RINOK(callback->SetOperationResult(NUpdate::NOperationResult::kOK))
+  }
+
+  RINOK(WriteUInt32(stream, kEnd)) // end of archive
+  return S_OK;
+}
+
+}
+
+Z7_COM7F_IMF(CHandler::GetFileTimeType(UInt32 *timeType))
+{
+  if (!timeType)
+    return E_INVALIDARG;
+  *timeType = NFileTimeType::kWindows;
+  return S_OK;
+}
+
+Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outStream, UInt32 numItems,
+    IArchiveUpdateCallback *updateCallback))
+{
+  COM_TRY_BEGIN
+  if (!outStream || !updateCallback)
+    return E_INVALIDARG;
+  if (_format)
+    return E_NOTIMPL; // updating an existing ALZ/EGG archive is not implemented
+
+  std::vector<CWriteItem> items;
+  items.reserve(numItems);
+  UInt64 totalSize = 0;
+  for (UInt32 i = 0; i < numItems; ++i)
+  {
+    Int32 newData = 0;
+    Int32 newProps = 0;
+    UInt32 indexInArchive = 0;
+    RINOK(updateCallback->GetUpdateItemInfo(i, &newData, &newProps, &indexInArchive))
+    (void)indexInArchive;
+    if (!newProps)
+      return E_NOTIMPL;
+
+    CWriteItem item;
+    {
+      NCOM::CPropVariant prop;
+      RINOK(updateCallback->GetProperty(i, kpidPath, &prop))
+      if (prop.vt != VT_BSTR)
+        return E_INVALIDARG;
+      UString path = prop.bstrVal;
+      AString encoded = UnicodeStringToMultiByte(path, _isEgg ? CP_UTF8 : 949);
+      if (encoded.IsEmpty())
+        return E_INVALIDARG;
+      item.Name.assign(encoded.Ptr(), encoded.Len());
+      for (size_t j = 0; j < item.Name.size(); ++j)
+        if (item.Name[j] == '\\')
+          item.Name[j] = '/';
+    }
+    {
+      NCOM::CPropVariant prop;
+      RINOK(updateCallback->GetProperty(i, kpidIsDir, &prop))
+      if (prop.vt == VT_BOOL)
+        item.IsDir = prop.boolVal != VARIANT_FALSE;
+      else if (prop.vt != VT_EMPTY)
+        return E_INVALIDARG;
+    }
+    if (!newData && !item.IsDir)
+      return E_NOTIMPL;
+    if (item.IsDir && item.Name[item.Name.size() - 1] != '/')
+      item.Name.push_back('/');
+    if (item.Name.empty() || item.Name.size() > 0xFFFF)
+      return E_INVALIDARG;
+
+    if (!item.IsDir)
+    {
+      NCOM::CPropVariant prop;
+      RINOK(updateCallback->GetProperty(i, kpidSize, &prop))
+      if (prop.vt == VT_UI8)
+        item.Size = prop.uhVal.QuadPart;
+      else if (prop.vt == VT_UI4)
+        item.Size = prop.ulVal;
+      else
+        return E_INVALIDARG;
+      if (item.Size > (UInt64)(-1) - totalSize)
+        return E_FAIL;
+      totalSize += item.Size;
+    }
+    {
+      NCOM::CPropVariant prop;
+      RINOK(updateCallback->GetProperty(i, kpidMTime, &prop))
+      if (prop.vt == VT_FILETIME)
+      {
+        if (_isEgg)
+          item.MTime = ((UInt64)prop.filetime.dwHighDateTime << 32) | prop.filetime.dwLowDateTime;
+        else
+          NTime::FileTime_To_DosTime(prop.filetime, item.DosTime);
+      }
+      else if (prop.vt != VT_EMPTY)
+        return E_INVALIDARG;
+    }
+    items.push_back(item);
+  }
+
+  RINOK(updateCallback->SetTotal(totalSize))
+  UInt64 completed = 0;
+  RINOK(updateCallback->SetCompleted(&completed))
+  CrcGenerateTable();
+  CTempFiles tempFiles;
+  const UInt64 eggBlockSize = (UInt64)256 * 1024 * 1024;
+  for (UInt32 i = 0; i < numItems; ++i)
+  {
+    if (!items[i].IsDir)
+      RINOK(ReadAndStageFile(updateCallback, i, items[i], tempFiles, completed, eggBlockSize))
+  }
+
+  for (UInt32 i = 0; i < numItems; ++i)
+  {
+    CWriteItem &item = items[i];
+    if (item.IsDir || item.Size == 0 || !item.Data)
+      continue;
+    rewind(item.Data);
+    if (!_isEgg)
+    {
+      UInt64 packedSize = 0;
+      FILE *packedData = NULL;
+      RINOK(CompressTemp(item.Data, item.Size, tempFiles, &packedData, &packedSize))
+      if (packedSize < item.Size)
+      {
+        item.Method = 2; // ALZ Deflate
+        item.PackedData = packedData;
+        item.PackedSize = packedSize;
+      }
+    }
+    else
+    {
+      for (size_t j = 0; j < item.Blocks.size(); ++j)
+      {
+        CWriteBlock &block = item.Blocks[j];
+        UInt64 packedSize = 0;
+        FILE *packedData = NULL;
+        RINOK(CompressTemp(item.Data, block.Size, tempFiles, &packedData, &packedSize))
+        if (packedSize < block.Size)
+        {
+          block.Method = 1; // EGG Deflate
+          block.PackedData = packedData;
+          block.PackedSize = (UInt32)packedSize;
+        }
+      }
+    }
+  }
+
+  if (_isEgg)
+    return WriteEggArchive(outStream, items, updateCallback);
+  return WriteAlzArchive(outStream, items, updateCallback);
+  COM_TRY_END
+}
+
 int CHandlerEvents::Initialize(nest::Workspace *) { return Result::Success; }
 void CHandlerEvents::Finalize(int) {}
 int CHandlerEvents::OnWorkStart(int) { return Result::Success; }
@@ -708,13 +1195,19 @@ static const Byte kSigEgg[] = { 'E', 'G', 'G', 'A' };
 namespace NArchive {
 namespace NAlz {
 
-REGISTER_ARC_I_CLS(NAlzEgg::CHandler, "ALZ", "alz", NULL, 0xE6,
-    kSigAlz, 0, 0, NULL)
+static IInArchive *CreateAlzIn() { return new NAlzEgg::CHandler(false); }
+static IOutArchive *CreateAlzOut() { return new NAlzEgg::CHandler(false); }
+
+REGISTER_ARC_R("ALZ", "alz", NULL, 0xE6, Z7_ARRAY_SIZE(kSigAlz), kSigAlz,
+    0, 0, 0, CreateAlzIn, CreateAlzOut, NULL)
 
 }
 namespace NEgg {
 
-REGISTER_ARC_I_CLS(NAlzEgg::CHandler, "EGG", "egg", NULL, 0xE8,
-    kSigEgg, 0, 0, NULL)
+static IInArchive *CreateEggIn() { return new NAlzEgg::CHandler(true); }
+static IOutArchive *CreateEggOut() { return new NAlzEgg::CHandler(true); }
+
+REGISTER_ARC_R("EGG", "egg", NULL, 0xE8, Z7_ARRAY_SIZE(kSigEgg), kSigEgg,
+    0, 0, 0, CreateEggIn, CreateEggOut, NULL)
 
 }}

@@ -57,7 +57,7 @@ public:
 
     inline bool IsCommentExists()
     {
-        return (GetBitFlags() & 8) == 1;
+        return (GetBitFlags() & 8) != 0;
     }
 
     inline unsigned char GetBaseSize()

@@ -98,6 +98,9 @@ jobs:
           if ($buildExitCode -ne 0) {
             "Windows build failed with exit code $buildExitCode. Last build output:" | Add-Content $env:GITHUB_STEP_SUMMARY
             Get-Content -LiteralPath $buildLog -Tail 120 | Add-Content $env:GITHUB_STEP_SUMMARY
+            $details = (Get-Content -LiteralPath $buildLog -Tail 60) -join "`n"
+            $details = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Windows build output::$details"
             throw "Windows build failed with exit code $buildExitCode."
           }
 
@@ -140,7 +143,20 @@ jobs:
           cmake --build CPP/7zip/Archive/AlzEgg/third_party/unegg/build --parallel 2
 
       - name: Build 7zz
-        run: make -j2 -f makefile.gcc
+        run: |
+          set -o pipefail
+          build_log="$RUNNER_TEMP/macos-build.log"
+          if make -j2 -f makefile.gcc 2>&1 | tee "$build_log"; then
+            exit 0
+          else
+            build_status=${PIPESTATUS[0]}
+            build_details=$(tail -n 60 "$build_log")
+            build_details=${build_details//'%'/'%25'}
+            build_details=${build_details//$'\r'/'%0D'}
+            build_details=${build_details//$'\n'/'%0A'}
+            echo "::error title=macOS build output::$build_details"
+            exit "$build_status"
+          fi
         working-directory: CPP/7zip/Bundles/Alone2
 
       - name: Stage build artifact
