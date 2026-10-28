@@ -33,16 +33,20 @@ jobs:
           cmake -S CPP/7zip/Archive/AlzEgg/third_party/unegg -B CPP/7zip/Archive/AlzEgg/third_party/unegg/build -DCMAKE_BUILD_TYPE=Release
           cmake --build CPP/7zip/Archive/AlzEgg/third_party/unegg/build --parallel 2
 
-      - name: Build 7zz
-        run: make -j2 -f makefile.gcc
+      - name: Build 7zz and static 7zzs
+        run: make -j2 -f makefile.gcc COMPL_STATIC=1
         working-directory: CPP/7zip/Bundles/Alone2
 
       - name: Stage build artifact
         run: |
           mkdir -p "dist/linux-${{ matrix.arch }}"
-          cp CPP/7zip/Bundles/Alone2/_o/7zz "dist/linux-${{ matrix.arch }}/"
+          cp CPP/7zip/Bundles/Alone2/_o/7zz CPP/7zip/Bundles/Alone2/_o/7zzs "dist/linux-${{ matrix.arch }}/"
+          python3 Installer/stage_resources.py linux ${{ matrix.arch }} "dist/linux-${{ matrix.arch }}"
           cp DOC/License.txt DOC/copying.txt DOC/unRarLicense.txt "dist/linux-${{ matrix.arch }}/"
           cp CPP/7zip/Archive/AlzEgg/third_party/unegg/LICENSE.txt "dist/linux-${{ matrix.arch }}/UnEGG-LICENSE.txt"
+
+      - name: Verify Linux distribution
+        run: python3 Installer/verify_distribution.py linux ${{ matrix.arch }} dist/linux-${{ matrix.arch }}
 
       - name: Upload Linux build
         uses: actions/upload-artifact@v7
@@ -69,7 +73,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
 
-      - name: Build 7zz.exe, 7z.dll, and 7zFM.exe
+      - name: Build Windows programs and Explorer integration
         shell: pwsh
         env:
           BUILD_ARCH: ${{ matrix.arch }}
@@ -110,10 +114,38 @@ jobs:
           if errorlevel 1 exit /b 1
           nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
           if errorlevel 1 exit /b 1
+          cd /d "%GITHUB_WORKSPACE%\CPP\7zip\UI\Console"
+          if errorlevel 1 exit /b 1
+          nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
+          if errorlevel 1 exit /b 1
+          cd /d "%GITHUB_WORKSPACE%\CPP\7zip\UI\GUI"
+          if errorlevel 1 exit /b 1
+          nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
+          if errorlevel 1 exit /b 1
+          cd /d "%GITHUB_WORKSPACE%\CPP\7zip\UI\Explorer"
+          if errorlevel 1 exit /b 1
+          nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
+          if errorlevel 1 exit /b 1
+          cd /d "%GITHUB_WORKSPACE%\CPP\7zip\Bundles\SFXWin"
+          if errorlevel 1 exit /b 1
+          nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
+          if errorlevel 1 exit /b 1
+          cd /d "%GITHUB_WORKSPACE%\CPP\7zip\Bundles\SFXCon"
+          if errorlevel 1 exit /b 1
+          nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
+          if errorlevel 1 exit /b 1
           cd /d "%GITHUB_WORKSPACE%\CPP\7zip\Bundles\SFXSetup"
           if errorlevel 1 exit /b 1
           nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
           if errorlevel 1 exit /b 1
+          if "%BUILD_ARCH%"=="arm64" goto build_complete
+          call "%VCVARS%" x86
+          if errorlevel 1 exit /b 1
+          cd /d "%GITHUB_WORKSPACE%\CPP\7zip\UI\Explorer"
+          if errorlevel 1 exit /b 1
+          nmake /nologo /f makefile PLATFORM=x86
+          if errorlevel 1 exit /b 1
+          :build_complete
           '@
           [IO.File]::WriteAllText($buildScript, $scriptText, [Text.Encoding]::ASCII)
 
@@ -141,6 +173,16 @@ jobs:
           Copy-Item "CPP\7zip\Bundles\Alone2\$env:BUILD_ARCH\7zz.exe" $artifactDir
           Copy-Item "CPP\7zip\Bundles\Format7zF\$env:BUILD_ARCH\7z.dll" $artifactDir
           Copy-Item "CPP\7zip\UI\FileManager\$env:BUILD_ARCH\7zFM.exe" $artifactDir
+          Copy-Item "CPP\7zip\UI\Console\$env:BUILD_ARCH\7z.exe" $artifactDir
+          Copy-Item "CPP\7zip\UI\GUI\$env:BUILD_ARCH\7zG.exe" $artifactDir
+          Copy-Item "CPP\7zip\UI\Explorer\$env:BUILD_ARCH\7-zip.dll" $artifactDir
+          Copy-Item "CPP\7zip\Bundles\SFXWin\$env:BUILD_ARCH\7z.sfx" $artifactDir
+          Copy-Item "CPP\7zip\Bundles\SFXCon\$env:BUILD_ARCH\7zCon.sfx" $artifactDir
+          if ($env:BUILD_ARCH -eq "x64") {
+            Copy-Item "CPP\7zip\UI\Explorer\x86\7-zip.dll" (Join-Path $artifactDir "7-zip32.dll")
+          }
+          python Installer/stage_resources.py windows $env:BUILD_ARCH $artifactDir --extractor (Join-Path $artifactDir "7zz.exe")
+          if ($LASTEXITCODE -ne 0) { throw "Could not stage Windows resources." }
           Copy-Item 'DOC\License.txt' $artifactDir
           Copy-Item 'DOC\copying.txt' $artifactDir
           Copy-Item 'DOC\unRarLicense.txt' $artifactDir
@@ -185,14 +227,18 @@ jobs:
 
           $msiName = "7zip-windows-$env:BUILD_ARCH.msi"
           $msiPath = Join-Path $artifactDir $msiName
+          $payloadWxs = Join-Path $env:RUNNER_TEMP "payload.wxs"
+          python Installer/generate_payload.py $artifactDir $payloadWxs
+          if ($LASTEXITCODE -ne 0) { throw "Could not generate MSI payload." }
           & $wix build -arch $env:BUILD_ARCH `
+            -d "BuildArch=$env:BUILD_ARCH" `
             -d "ProductName=7-Zip UzuCore ($env:BUILD_ARCH)" `
             -d "PackageVersion=$packageVersion" `
             -d "PayloadDir=$artifactDir" `
             -d "LicenseRtf=$licenseRtf" `
             -ext WixToolset.UI.wixext `
             -o $msiPath `
-            (Join-Path $env:GITHUB_WORKSPACE 'Installer\WindowsProduct.wxs')
+            (Join-Path $env:GITHUB_WORKSPACE 'Installer\WindowsProduct.wxs') $payloadWxs
           if ($LASTEXITCODE -ne 0) {
             throw "WiX failed to build the $env:BUILD_ARCH installer MSI."
           }
@@ -241,6 +287,9 @@ jobs:
           finally {
             $setupStream.Dispose()
           }
+
+      - name: Verify Windows distribution
+        run: python Installer/verify_distribution.py windows ${{ matrix.arch }} dist/windows-${{ matrix.arch }}
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v7
@@ -299,8 +348,12 @@ jobs:
         run: |
           mkdir -p "dist/macos-${{ matrix.arch }}"
           cp CPP/7zip/Bundles/Alone2/_o/7zz "dist/macos-${{ matrix.arch }}/"
+          python3 Installer/stage_resources.py macos ${{ matrix.arch }} "dist/macos-${{ matrix.arch }}"
           cp DOC/License.txt DOC/copying.txt DOC/unRarLicense.txt "dist/macos-${{ matrix.arch }}/"
           cp CPP/7zip/Archive/AlzEgg/third_party/unegg/LICENSE.txt "dist/macos-${{ matrix.arch }}/UnEGG-LICENSE.txt"
+
+      - name: Verify macOS distribution
+        run: python3 Installer/verify_distribution.py macos ${{ matrix.arch }} dist/macos-${{ matrix.arch }} ${{ matrix.arch == 'arm64' && '--skip-run' || '' }}
 
       - name: Upload macOS build
         uses: actions/upload-artifact@v7
@@ -335,6 +388,7 @@ jobs:
             asset_name="${artifact_dir##*/}"
             case "$asset_name" in
               7zip-linux-*|7zip-macos-*)
+                chmod +x "$artifact_dir"/7zz*
                 tar -C "$artifact_dir" -cJf "release/${asset_name}.tar.xz" .
                 ;;
               7zip-windows-*)

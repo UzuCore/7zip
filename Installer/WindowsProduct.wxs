@@ -1,64 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package
-      Name="$(var.ProductName)"
-      Manufacturer="UzuCore"
-      Version="$(var.PackageVersion)"
-      UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}"
-      Scope="perMachine">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="$(var.ProductName)" Manufacturer="UzuCore" Version="$(var.PackageVersion)"
+           UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine">
     <MajorUpgrade DowngradeErrorMessage="A newer version of 7-Zip UzuCore is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
-
     <Property Id="ARPCONTACT" Value="UzuCore" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/UzuCore/7zip" />
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
-
     <Feature Id="Complete" Title="$(var.ProductName)" Level="1">
-      <ComponentRef Id="SevenZipConsoleComponent" />
-      <ComponentRef Id="SevenZipFormatsComponent" />
-      <ComponentRef Id="SevenZipFileManagerComponent" />
-      <ComponentRef Id="LicenseTextComponent" />
-      <ComponentRef Id="CopyingTextComponent" />
-      <ComponentRef Id="UnRarLicenseTextComponent" />
-      <ComponentRef Id="UnEggLicenseTextComponent" />
+      <ComponentGroupRef Id="PayloadComponents" />
+      <ComponentRef Id="ShellIntegration" />
       <ComponentRef Id="StartMenuShortcut" />
+      <?if $(var.BuildArch) = x64 ?>
+      <ComponentRef Id="ShellIntegration32" />
+      <?endif?>
     </Feature>
-
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="7-Zip UzuCore">
-        <Component Id="SevenZipConsoleComponent" Guid="*">
-          <File Id="SevenZipConsole" Source="$(var.PayloadDir)\7zz.exe" KeyPath="yes" />
+        <Component Id="ShellIntegration" Guid="*">
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{23170F69-40C1-278A-1000-000100020001}\InprocServer32" Type="string" Value="[INSTALLFOLDER]7-zip.dll" KeyPath="yes" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{23170F69-40C1-278A-1000-000100020001}\InprocServer32" Name="ThreadingModel" Type="string" Value="Apartment" />
+          <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved" Name="{23170F69-40C1-278A-1000-000100020001}" Type="string" Value="7-Zip UzuCore Shell Extension" />
+          <RegistryValue Root="HKLM" Key="Software\7-Zip UzuCore" Name="Path" Type="string" Value="[INSTALLFOLDER]" />
+          <RegistryValue Root="HKLM" Key="Software\7-Zip UzuCore" Name="Path64" Type="string" Value="[INSTALLFOLDER]" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\*\shellex\ContextMenuHandlers\7-Zip UzuCore" Type="string" Value="{23170F69-40C1-278A-1000-000100020001}" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\Directory\shellex\ContextMenuHandlers\7-Zip UzuCore" Type="string" Value="{23170F69-40C1-278A-1000-000100020001}" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\Folder\shellex\ContextMenuHandlers\7-Zip UzuCore" Type="string" Value="{23170F69-40C1-278A-1000-000100020001}" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\Directory\shellex\DragDropHandlers\7-Zip UzuCore" Type="string" Value="{23170F69-40C1-278A-1000-000100020001}" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\Drive\shellex\DragDropHandlers\7-Zip UzuCore" Type="string" Value="{23170F69-40C1-278A-1000-000100020001}" />
         </Component>
-        <Component Id="SevenZipFormatsComponent" Guid="*">
-          <File Id="SevenZipFormats" Source="$(var.PayloadDir)\7z.dll" />
+        <?if $(var.BuildArch) = x64 ?>
+        <Component Id="ShellIntegration32" Guid="*" Bitness="always32">
+          <File Source="$(var.PayloadDir)\7-zip32.dll" KeyPath="yes" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{23170F69-40C1-278A-1000-000100020001}\InprocServer32" Type="string" Value="[INSTALLFOLDER]7-zip32.dll" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{23170F69-40C1-278A-1000-000100020001}\InprocServer32" Name="ThreadingModel" Type="string" Value="Apartment" />
         </Component>
-        <Component Id="SevenZipFileManagerComponent" Guid="*">
-          <File Id="SevenZipFileManager" Source="$(var.PayloadDir)\7zFM.exe" />
-        </Component>
-        <Component Id="LicenseTextComponent" Guid="*">
-          <File Id="LicenseText" Source="$(var.PayloadDir)\License.txt" />
-        </Component>
-        <Component Id="CopyingTextComponent" Guid="*">
-          <File Id="CopyingText" Source="$(var.PayloadDir)\copying.txt" />
-        </Component>
-        <Component Id="UnRarLicenseTextComponent" Guid="*">
-          <File Id="UnRarLicenseText" Source="$(var.PayloadDir)\unRarLicense.txt" />
-        </Component>
-        <Component Id="UnEggLicenseTextComponent" Guid="*">
-          <File Id="UnEggLicenseText" Source="$(var.PayloadDir)\UnEGG-LICENSE.txt" />
-        </Component>
+        <?endif?>
       </Directory>
     </StandardDirectory>
-
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationStartMenuFolder" Name="7-Zip UzuCore">
         <Component Id="StartMenuShortcut" Guid="*">
-          <Shortcut Id="FileManagerShortcut"
-                    Name="7-Zip File Manager"
-                    Target="[#SevenZipFileManager]"
-                    WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut Id="FileManagerShortcut" Name="7-Zip UzuCore File Manager" Target="[#SevenZipFileManager]" WorkingDirectory="INSTALLFOLDER" />
           <RemoveFolder Id="RemoveStartMenuFolder" Directory="ApplicationStartMenuFolder" On="uninstall" />
           <RegistryValue Root="HKLM" Key="Software\UzuCore\7-Zip" Name="installed" Type="integer" Value="1" KeyPath="yes" />
         </Component>
