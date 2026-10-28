@@ -220,7 +220,8 @@ jobs:
           $setupConfigText = @"
           ;!@Install@!UTF-8!
           Title="7-Zip UzuCore Setup"
-          RunProgram="msiexec.exe /i $msiName"
+          ExecuteFile="msiexec.exe"
+          ExecuteParameters="/i $msiName"
           ;!@InstallEnd@!
           "@
           [IO.File]::WriteAllText($setupConfig, $setupConfigText, [Text.Encoding]::ASCII)
