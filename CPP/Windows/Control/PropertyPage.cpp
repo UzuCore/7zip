@@ -8,6 +8,10 @@
 
 #include "PropertyPage.h"
 
+#if defined(Z7_UI_THEME) && !defined(UNDER_CE)
+#include "DialogTheme.h"
+#endif
+
 extern HINSTANCE g_hInstance;
 #ifndef _UNICODE
 extern bool g_IsNT;
@@ -32,7 +36,15 @@ APIENTRY MyProperyPageProcedure(HWND dialogHWND, UINT message, WPARAM wParam, LP
     return FALSE;
   if (message == WM_INITDIALOG)
     dialog->Attach(dialogHWND);
-  try { return BoolToBOOL(dialog->OnMessage(message, wParam, lParam)); }
+  try
+  {
+    const bool result = dialog->OnMessage(message, wParam, lParam);
+    #if defined(Z7_UI_THEME) && !defined(UNDER_CE)
+    if (message == WM_INITDIALOG)
+      NDialogTheme::Attach(dialogHWND, true);
+    #endif
+    return BoolToBOOL(result);
+  }
   catch(...) { return TRUE; }
 }
 

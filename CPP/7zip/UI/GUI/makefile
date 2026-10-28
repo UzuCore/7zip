@@ -1,5 +1,6 @@
 PROG = 7zG.exe
 CFLAGS = $(CFLAGS) \
+  -DZ7_UI_THEME \
   -DZ7_LANG \
   -DZ7_EXTERNAL_CODECS \
 
@@ -146,3 +147,6 @@ C_OBJS = \
 !include "../../Sort.mak"
 
 !include "../../7zip.mak"
+
+# Rebuild the affected windows when editing the shared theme headers.
+$O\Dialog.obj: ../../../Windows/Control/DialogTheme.h

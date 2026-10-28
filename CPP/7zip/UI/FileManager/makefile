@@ -1,5 +1,6 @@
 PROG = 7zFM.exe
 CFLAGS = $(CFLAGS) \
+  -DZ7_UI_THEME \
   -DZ7_EXTERNAL_CODECS \
 
 # -DZ7_NO_LARGE_PAGES
@@ -108,3 +109,8 @@ C_OBJS = $(C_OBJS) \
 
 !include "../../Sort.mak"
 !include "../../7zip.mak"
+
+# Rebuild the affected windows when editing the shared theme headers.
+$O\Dialog.obj: ../../../Windows/Control/DialogTheme.h
+$O\PropertyPage.obj: ../../../Windows/Control/DialogTheme.h
+$O\FM.obj: ThemePreview.h

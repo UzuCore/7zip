@@ -588,6 +588,8 @@ static LRESULT CALLBACK MainProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp,
       RegCloseKey(key);
     }
     Apply(wnd);
+    // Notify already open 7zip+alpha worker dialogs without changing Windows settings.
+    SendNotifyMessageW(HWND_BROADCAST, RegisterWindowMessageW(L"7zip.Alpha.ThemeChanged"), 0, 0);
     return 0;
   }
   if (g_Dark && msg == WM_NOTIFY && ((NMHDR *)lp)->code == NM_CUSTOMDRAW)
