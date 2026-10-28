@@ -354,8 +354,8 @@ jobs:
           release_date="$(TZ=Asia/Seoul date +%Y.%m.%d)"
           release_title_date="$(TZ=Asia/Seoul date +%Y-%m-%d)"
           echo "date=${release_title_date}" >> "$GITHUB_OUTPUT"
-          echo "tag=build-${release_date}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "title=7-Zip ${release_title_date} (build #${GITHUB_RUN_NUMBER})" >> "$GITHUB_OUTPUT"
+          echo "tag=build-${release_date}" >> "$GITHUB_OUTPUT"
+          echo "title=7-Zip ${release_title_date}" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub Release
         uses: actions/github-script@v9
@@ -368,18 +368,36 @@ jobs:
             const fs = require("fs");
             const path = require("path");
             const { owner, repo } = context.repo;
-            const tag = process.env.RELEASE_TAG;
+            const dateTag = process.env.RELEASE_TAG;
             const files = fs.readdirSync("release").filter((file) => file.endsWith(".tar.xz") || /\.(7z|exe|msi)$/.test(file)).sort();
 
             if (files.length !== 10) {
               throw new Error(`Expected 10 release assets, found ${files.length}: ${files.join(", ")}`);
             }
 
-            let release;
-            try {
-              ({ data: release } = await github.rest.repos.getReleaseByTag({ owner, repo, tag }));
-            } catch (error) {
-              if (error.status !== 404) throw error;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            let release = releases.find((candidate) =>
+              candidate.tag_name === dateTag || candidate.tag_name.startsWith(`${dateTag}-`)
+            );
+            const tag = release ? release.tag_name : dateTag;
+
+            if (release) {
+              ({ data: release } = await github.rest.repos.updateRelease({
+                owner,
+                repo,
+                release_id: release.id,
+                target_commitish: context.sha,
+                name: process.env.RELEASE_TITLE,
+                body: `Automated build for ${process.env.RELEASE_DATE}.`,
+                draft: false,
+                prerelease: false,
+              }));
+              console.log(`Updating existing release ${tag} for ${process.env.RELEASE_DATE}.`);
+            } else {
               ({ data: release } = await github.rest.repos.createRelease({
                 owner,
                 repo,
@@ -390,7 +408,16 @@ jobs:
                 draft: false,
                 prerelease: false,
               }));
+              console.log(`Created release ${tag} for ${process.env.RELEASE_DATE}.`);
             }
+
+            await github.rest.git.updateRef({
+              owner,
+              repo,
+              ref: `tags/${tag}`,
+              sha: context.sha,
+              force: true,
+            });
 
             const existingAssets = await github.paginate(github.rest.repos.listReleaseAssets, {
               owner,
