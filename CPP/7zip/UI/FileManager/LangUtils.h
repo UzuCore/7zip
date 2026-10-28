@@ -42,6 +42,7 @@ inline void AddLangString(UString &s, UInt32 langID) { s += NWindows::MyLoadStri
 
 // Format-specific Korean particle; other languages use the existing translation.
 UString LangString_CompressTo(bool isZip);
+UString LangString_Compress();
 
 FString GetLangDirPrefix();
 // bool LangOpen(CLang &lang, CFSTR fileName);

@@ -339,3 +339,9 @@ UString LangString_CompressTo(bool isZip)
     return UString(isZip ? L"{0} \uc73c\ub85c \uc555\ucd95" : L"{0} \ub85c \uc555\ucd95");
   return LangString(IDS_CONTEXT_COMPRESS_TO);
 }
+UString LangString_Compress()
+{
+  if (g_LangID.IsEqualTo_Ascii_NoCase("ko"))
+    return UString(L"\uc555\ucd95 \ud558\uae30...");
+  return LangString(IDS_CONTEXT_COMPRESS);
+}

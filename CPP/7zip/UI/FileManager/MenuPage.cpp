@@ -234,7 +234,9 @@ bool CMenuPage::OnInit()
     const CContextMenuItem &menuItem = kMenuItems[i];
 
     UString s = LangString(menuItem.ControlID);
-    if (menuItem.Flag == kCRC)
+    if (menuItem.Flag == kCompress)
+      s = LangString_Compress();
+    else if (menuItem.Flag == kCRC)
       s = "CRC SHA";
     else if (menuItem.Flag == kCRC_Cascaded)
       s = "7-Zip > CRC SHA";
