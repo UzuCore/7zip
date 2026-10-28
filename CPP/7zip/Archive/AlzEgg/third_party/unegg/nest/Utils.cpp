@@ -321,6 +321,115 @@ size_t euckr2utf8(const char* str, std::string* utf8)
 #endif
 }
 
+size_t utf82euckr(const char* str, std::string* euckr)
+{
+    if (!euckr || !str)
+    {
+        if (euckr)
+        {
+            euckr->clear();
+        }
+        return static_cast<size_t> (-1);
+    }
+
+    size_t len = ::strlen(str);
+    if (!len)
+    {
+        euckr->clear();
+        return 0;
+    }
+
+#ifdef _WIN32
+    if (len > (size_t)INT_MAX)
+    {
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    const int wideLength = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+        str, (int)len, NULL, 0);
+    if (wideLength <= 0)
+    {
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    std::vector<wchar_t> wide((size_t)wideLength);
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+        str, (int)len, &wide[0], wideLength) != wideLength)
+    {
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    BOOL usedDefault = FALSE;
+    const int euckrLength = WideCharToMultiByte(949, WC_NO_BEST_FIT_CHARS,
+        &wide[0], wideLength, NULL, 0, NULL, &usedDefault);
+    if (euckrLength <= 0 || usedDefault)
+    {
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    std::string converted((size_t)euckrLength, '\0');
+    usedDefault = FALSE;
+    if (WideCharToMultiByte(949, WC_NO_BEST_FIT_CHARS,
+        &wide[0], wideLength, &converted[0], euckrLength, NULL, &usedDefault) != euckrLength ||
+        usedDefault)
+    {
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    *euckr = converted;
+    return 0;
+#else
+    if (len == (size_t)(-1))
+    {
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    iconv_t converter = iconv_open("EUC-KR", "UTF-8");
+    if (converter == (iconv_t)(-1))
+    {
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    const size_t outputSize = len;
+    char* buffer = (char*)::malloc(outputSize + 1);
+    if (!buffer)
+    {
+        iconv_close(converter);
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    char* input = const_cast<char*>(str);
+    size_t inputLeft = len;
+    char* output = buffer;
+    size_t outputLeft = outputSize;
+#ifdef __MINGW32__
+    size_t result = iconv(converter, (const char**)&input, &inputLeft, &output, &outputLeft);
+#else
+    size_t result = iconv(converter, &input, &inputLeft, &output, &outputLeft);
+#endif
+    iconv_close(converter);
+
+    if (result == static_cast<size_t> (-1) || inputLeft != 0)
+    {
+        ::free(buffer);
+        euckr->clear();
+        return static_cast<size_t> (-1);
+    }
+
+    euckr->assign(buffer, outputSize - outputLeft);
+    ::free(buffer);
+    return 0;
+#endif
+}
+
 size_t console_len(const char* str, size_t bytes)
 {
     char* p = (char*) str;

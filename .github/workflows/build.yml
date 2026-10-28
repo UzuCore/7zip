@@ -141,6 +141,18 @@ jobs:
           Copy-Item 'DOC\copying.txt' $artifactDir
           Copy-Item 'DOC\unRarLicense.txt' $artifactDir
           Copy-Item 'CPP\7zip\Archive\AlzEgg\third_party\unegg\LICENSE.txt' (Join-Path $artifactDir 'UnEGG-LICENSE.txt')
+          $portableArchive = Join-Path $env:RUNNER_TEMP "7zip-windows-$env:BUILD_ARCH.7z"
+          Push-Location $artifactDir
+          try {
+            & (Join-Path $artifactDir '7zz.exe') a -t7z $portableArchive '*'
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to package Windows $env:BUILD_ARCH portable archive."
+            }
+          }
+          finally {
+            Pop-Location
+          }
+          Move-Item -LiteralPath $portableArchive -Destination (Join-Path $artifactDir "7zip-windows-$env:BUILD_ARCH.7z")
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v7
@@ -233,7 +245,18 @@ jobs:
           mkdir -p release
           for artifact_dir in release-assets/7zip-*; do
             asset_name="${artifact_dir##*/}"
-            (cd "$artifact_dir" && zip -q -r "$GITHUB_WORKSPACE/release/${asset_name}.zip" .)
+            case "$asset_name" in
+              7zip-linux-*|7zip-macos-*)
+                tar -C "$artifact_dir" -cJf "release/${asset_name}.tar.xz" .
+                ;;
+              7zip-windows-*)
+                cp "$artifact_dir/${asset_name}.7z" "release/${asset_name}.7z"
+                ;;
+              *)
+                echo "Unexpected build artifact: $asset_name" >&2
+                exit 1
+                ;;
+            esac
           done
 
       - name: Generate date-based release metadata
@@ -257,7 +280,7 @@ jobs:
             const path = require("path");
             const { owner, repo } = context.repo;
             const tag = process.env.RELEASE_TAG;
-            const files = fs.readdirSync("release").filter((file) => file.endsWith(".zip")).sort();
+            const files = fs.readdirSync("release").filter((file) => file.endsWith(".tar.xz") || file.endsWith(".7z")).sort();
 
             if (files.length !== 6) {
               throw new Error(`Expected 6 release archives, found ${files.length}: ${files.join(", ")}`);
@@ -306,7 +329,7 @@ jobs:
                 name: file,
                 data,
                 headers: {
-                  "content-type": "application/zip",
+                  "content-type": file.endsWith(".tar.xz") ? "application/x-xz" : "application/x-7z-compressed",
                   "content-length": data.length,
                 },
               });

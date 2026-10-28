@@ -35,6 +35,7 @@ const char* find_r(const char* s, const char* substr);
 size_t p2i(const char* s, size_t pos);
 size_t i2p(const char* s, size_t index);
 size_t euckr2utf8(const char* str, std::string* utf8);
+size_t utf82euckr(const char* str, std::string* euckr);
 size_t console_len(const char* str, size_t bytes = 0);
 void limit(char* buffer, size_t size, size_t limitWidth, const char* str);
 const char* limit(size_t limitWidth, const char* str);

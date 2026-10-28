@@ -28,6 +28,12 @@
 #include <vector>
 #include <string.h>
 
+namespace nest {
+namespace utf8 {
+size_t utf82euckr(const char *str, std::string *euckr);
+}
+}
+
 using namespace NWindows;
 
 namespace NArchive {
@@ -407,9 +413,14 @@ HRESULT CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *value) t
       const char *name = info->AsString(nest::key::file::name::NAME, &handled);
       if (handled && name)
       {
-        bool isUtf8Handled = false;
-        const bool isUtf8 = info->AsBool(nest::key::file::name::IS_UTF8, &isUtf8Handled);
-        const UINT codePage = (isUtf8Handled && isUtf8) ? CP_UTF8 : 949;
+        bool isUtf8 = false;
+        if (_isEgg)
+        {
+          bool isUtf8Handled = false;
+          isUtf8 = info->AsBool(nest::key::file::name::IS_UTF8, &isUtf8Handled) &&
+              isUtf8Handled;
+        }
+        const UINT codePage = isUtf8 ? CP_UTF8 : 949;
         UString path = MultiByteToUnicodeString(name, codePage);
         path.Replace(L'/', WCHAR_PATH_SEPARATOR);
         path.Replace(L'\\', WCHAR_PATH_SEPARATOR);
@@ -968,10 +979,13 @@ Z7_COM7F_IMF(CHandler::UpdateItems(ISequentialOutStream *outStream, UInt32 numIt
       if (prop.vt != VT_BSTR)
         return E_INVALIDARG;
       UString path = prop.bstrVal;
-      AString encoded = UnicodeStringToMultiByte(path, _isEgg ? CP_UTF8 : 949);
-      if (encoded.IsEmpty())
+      AString utf8Name = UnicodeStringToMultiByte(path, CP_UTF8);
+      if (utf8Name.IsEmpty())
         return E_INVALIDARG;
-      item.Name.assign(encoded.Ptr(), encoded.Len());
+      if (_isEgg)
+        item.Name.assign(utf8Name.Ptr(), utf8Name.Len());
+      else if (nest::utf8::utf82euckr(utf8Name.Ptr(), &item.Name) != 0)
+        return E_INVALIDARG;
       for (size_t j = 0; j < item.Name.size(); ++j)
         if (item.Name[j] == '\\')
           item.Name[j] = '/';

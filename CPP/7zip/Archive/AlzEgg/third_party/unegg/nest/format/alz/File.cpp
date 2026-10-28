@@ -174,7 +174,7 @@ int File::_As4Bytes(unsigned int key, bool* handled)
     VERIFY_KEY(key::file::method::METHOD, GetCompressMethod());
     VERIFY_KEY(key::file::CRC, GetCRC());
 
-    return Info::AsInt32(key, handled);
+    return Info::_As4Bytes(key, handled);
 }
 
 int64 File::_As8Bytes(unsigned int key, bool* handled)
@@ -183,14 +183,14 @@ int64 File::_As8Bytes(unsigned int key, bool* handled)
     VERIFY_KEY(key::file::size::UNPACKED, GetUnpackedSize());
     VERIFY_KEY(key::file::OFFSET, GetDataOffset());
 
-    return Info::AsInt64(key, handled);
+    return Info::_As8Bytes(key, handled);
 }
 
 size_t File::_AsSize(unsigned int key, bool* handled)
 {
     VERIFY_KEY(key::file::BLOCK_COUNT, 0);
 
-    return Info::AsSize(key, handled);
+    return Info::_AsSize(key, handled);
 }
 
 const char* File::GetCompressMethodString()
@@ -205,7 +205,7 @@ const void* File::_AsPtr(unsigned int key, bool* handled)
     VERIFY_KEY(key::file::method::NAME, GetCompressMethodString());
     VERIFY_KEY(key::file::encrypt::VERIFY_DATA, GetVerifyData());
 
-    return Info::AsPtr(key, handled);
+    return Info::_AsPtr(key, handled);
 }
 
 }
