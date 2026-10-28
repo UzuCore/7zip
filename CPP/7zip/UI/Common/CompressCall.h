@@ -15,6 +15,8 @@ HRESULT CompressFiles(
     const UStringVector &names,
     bool showDialog, bool waitFinish);
 
+HRESULT CompressFilesEach(const UString &outFolder, const UStringVector &names);
+
 void ExtractArchives(const UStringVector &arcPaths, const UString &outFolder, bool showDialog, bool elimDup, UInt32 writeZone);
 void TestArchives(const UStringVector &arcPaths, bool hashMode = false);
 

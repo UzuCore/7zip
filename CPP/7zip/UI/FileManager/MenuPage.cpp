@@ -53,10 +53,12 @@ static const CContextMenuItem kMenuItems[] =
   { IDS_CONTEXT_EXTRACT, kExtract },
   { IDS_CONTEXT_EXTRACT_HERE, kExtractHere },
   { IDS_CONTEXT_EXTRACT_TO, kExtractTo },
+  { IDS_CONTEXT_EXTRACT_EACH, kExtractEach },
 
   { IDS_CONTEXT_TEST, kTest },
 
   { IDS_CONTEXT_COMPRESS, kCompress },
+  { IDS_CONTEXT_COMPRESS_EACH, kCompressEach },
   { IDS_CONTEXT_COMPRESS_TO, kCompressTo7z },
   { IDS_CONTEXT_COMPRESS_TO, kCompressToZip },
 
@@ -234,7 +236,9 @@ bool CMenuPage::OnInit()
     const CContextMenuItem &menuItem = kMenuItems[i];
 
     UString s = LangString(menuItem.ControlID);
-    if (menuItem.Flag == kCompress)
+    if (menuItem.Flag == kCompressEach || menuItem.Flag == kExtractEach)
+      s = LangString_Each(menuItem.Flag == kCompressEach);
+    else if (menuItem.Flag == kCompress)
       s = LangString_Compress();
     else if (menuItem.Flag == kCRC)
       s = "CRC SHA";

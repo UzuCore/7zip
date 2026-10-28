@@ -5,6 +5,7 @@
 #ifndef Z7_EXTERNAL_CODECS
 
 #include "../../../Common/MyException.h"
+#include "../../../Windows/FileFind.h"
 
 #include "../../UI/Common/EnumDirItems.h"
 
@@ -151,6 +152,42 @@ HRESULT CompressFiles(
   return S_OK;
 }
 
+
+HRESULT CompressFilesEach(const UString &outFolder, const UStringVector &names)
+{
+  MY_TRY_BEGIN
+  result = S_OK;
+  FOR_VECTOR (i, names)
+  {
+    NWindows::NFile::NFind::CFileInfo fi;
+    if (!fi.Find(us2fs(names[i])))
+      throw CSystemException(HRESULT_FROM_WIN32(GetLastError()));
+    UString name = fs2us(fi.Name);
+    if (!fi.IsDir())
+    {
+      const int dot = name.ReverseFind_Dot();
+      if (dot > 0)
+        name.DeleteFrom((unsigned)dot);
+    }
+    UString prefix = outFolder;
+    prefix.Add_PathSepar();
+    prefix += name;
+    UString dest = prefix + L".zip";
+    for (unsigned n = 2; NWindows::NFile::NFind::DoesFileOrDirExist(us2fs(dest)); n++)
+    {
+      dest = prefix + L" (";
+      dest.Add_UInt32(n);
+      dest += ").zip";
+    }
+    UStringVector one;
+    one.Add(names[i]);
+    result = CompressFiles(UString(), dest, UString("zip"), false, one, false, true);
+    if (result != S_OK)
+      break;
+  }
+  MY_TRY_FINISH
+  return result;
+}
 
 static HRESULT ExtractGroupCommand(const UStringVector &arcPaths,
     bool showDialog, CExtractOptions &eo, const char *kType = NULL)

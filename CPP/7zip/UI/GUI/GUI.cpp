@@ -20,6 +20,7 @@
 #include "../../../Common/StringConvert.h"
 
 #include "../../../Windows/FileDir.h"
+#include "../../../Windows/FileFind.h"
 #include "../../../Windows/NtCheck.h"
 
 #include "../Common/ArchiveCommandLine.h"
@@ -134,20 +135,17 @@ static void ThrowException_if_Error(HRESULT res)
     throw CSystemException(res);
 }
 
-static int Main2()
+static int RunCommand(UStringVector commandStrings)
 {
-  UStringVector commandStrings;
-  NCommandLineParser::SplitCommandLine(GetCommandLineW(), commandStrings);
-
-  #ifndef UNDER_CE
-  if (commandStrings.Size() > 0)
-    commandStrings.Delete(0);
-  #endif
   if (commandStrings.Size() == 0)
   {
     MessageBoxW(NULL, L"Specify command", L"7-Zip", 0);
     return 0;
   }
+
+  const bool compressEach = commandStrings[0].IsEqualTo_Ascii_NoCase("a-each");
+  if (compressEach)
+    commandStrings[0] = "a";
 
   CArcCmdLineOptions options;
   CArcCmdLineParser parser;
@@ -155,6 +153,53 @@ static int Main2()
   parser.Parse1(commandStrings, options);
   g_DisableUserQuestions = options.YesToAll;
   parser.Parse2(options);
+
+  if (compressEach)
+  {
+    if (options.ArchiveName.IsEmpty() || options.Censor.CensorPaths.IsEmpty())
+      throw CSystemException(E_INVALIDARG);
+    // Parse2 reads and acknowledges the shared selection before any compression.
+    // Update commands retain the original, unexpanded CensorPaths here.
+    FOR_VECTOR (i, options.Censor.CensorPaths)
+    {
+      const NWildcard::CCensorPath &item = options.Censor.CensorPaths[i];
+      if (!item.Include || item.Props.WildcardMatching)
+        throw CSystemException(E_INVALIDARG);
+      NFile::NFind::CFileInfo fi;
+      if (!fi.Find(us2fs(item.Path)))
+        throw CSystemException(HRESULT_FROM_WIN32(GetLastError()));
+      UString name = fs2us(fi.Name);
+      if (!fi.IsDir())
+      {
+        const int dot = name.ReverseFind_Dot();
+        if (dot > 0)
+          name.DeleteFrom((unsigned)dot);
+      }
+      UString prefix = options.ArchiveName;
+      prefix.Add_PathSepar();
+      prefix += name;
+      UString dest = prefix + L".zip";
+      // Never merge different selected items or update an existing archive.
+      for (unsigned n = 2; NFile::NFind::DoesFileOrDirExist(us2fs(dest)); n++)
+      {
+        dest = prefix + L" (";
+        dest.Add_UInt32(n);
+        dest += ").zip";
+      }
+      UStringVector args;
+      args.Add(UString("a"));
+      args.Add(UString("-tzip"));
+      args.Add(UString("-sae"));
+      args.Add(UString("-spd"));
+      args.Add(UString("--"));
+      args.Add(dest);
+      args.Add(item.Path);
+      const int result = RunCommand(args);
+      if (result != NExitCode::kSuccess)
+        return result; // Stop the batch on cancellation or an error.
+    }
+    return NExitCode::kSuccess;
+  }
 
   CREATE_CODECS_OBJECT
 
@@ -412,6 +457,17 @@ static int Main2()
 #if defined(_UNICODE) && !defined(_WIN64) && !defined(UNDER_CE)
 #define NT_CHECK_FAIL_ACTION ErrorMessage("Unsupported Windows version"); return NExitCode::kFatalError;
 #endif
+
+static int Main2()
+{
+  UStringVector commandStrings;
+  NCommandLineParser::SplitCommandLine(GetCommandLineW(), commandStrings);
+  #ifndef UNDER_CE
+  if (!commandStrings.IsEmpty())
+    commandStrings.Delete(0);
+  #endif
+  return RunCommand(commandStrings);
+}
 
 int APIENTRY WinMain(HINSTANCE  hInstance, HINSTANCE /* hPrevInstance */,
   #ifdef UNDER_CE

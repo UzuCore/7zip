@@ -271,6 +271,8 @@ static const CContextMenuCommand g_Commands[] =
   CMD_REC( kExtract,     "Extract",     IDS_CONTEXT_EXTRACT),
   CMD_REC( kExtractHere, "ExtractHere", IDS_CONTEXT_EXTRACT_HERE),
   CMD_REC( kExtractTo,   "ExtractTo",   IDS_CONTEXT_EXTRACT_TO),
+  CMD_REC( kExtractEach, "ExtractEach", IDS_CONTEXT_EXTRACT_EACH),
+  CMD_REC( kCompressEach, "CompressEach", IDS_CONTEXT_COMPRESS_EACH),
   CMD_REC( kTest,        "Test",        IDS_CONTEXT_TEST),
   CMD_REC( kCompress,           "Compress",           IDS_CONTEXT_COMPRESS),
   CMD_REC( kCompressTo7z,       "CompressTo7z",       IDS_CONTEXT_COMPRESS_TO),
@@ -323,7 +325,9 @@ void CZipContextMenu::FillCommand(enum_CommandInternalID id, UString &mainString
   cmi.Verb = kMainVerb;
   cmi.Verb += command.Verb;
   // cmi.HelpString = cmi.Verb;
-  if (id == kCompress)
+  if (id == kCompressEach || id == kExtractEach)
+    mainString = LangString_Each(id == kCompressEach);
+  else if (id == kCompress)
     mainString = LangString_Compress();
   else if (id == kCompressTo7z || id == kCompressToZip)
     mainString = LangString_CompressTo(id == kCompressToZip);
@@ -779,7 +783,7 @@ Z7_COMWF_B CZipContextMenu::QueryContextMenu(HMENU hMenu, UINT indexMenu,
 
   ODS("### 150")
 
-  if (_fileNames.Size() > 0 && currentCommandID + 10 <= commandIDLast)
+  if (_fileNames.Size() > 0 && currentCommandID + 12 <= commandIDLast)
   {
     ODS("### needExtract list START")
     const bool needExtendedVerbs = ((flags & Z7_WIN_CMF_EXTENDEDVERBS) != 0);
@@ -839,6 +843,15 @@ Z7_COMWF_B CZipContextMenu::QueryContextMenu(HMENU hMenu, UINT indexMenu,
           CCommandMapItem cmi;
           cmi.Folder = baseFolder;
           AddCommand(kExtractHere, mainString, cmi);
+          MyInsertMenu(popupMenu, subIndex++, currentCommandID++, mainString, bitmap);
+        }
+
+        if ((contextMenuFlags & NContextMenuFlags::kExtractEach) != 0)
+        {
+          CCommandMapItem cmi;
+          cmi.Folder = baseFolder + L"*";
+          cmi.Folder.Add_PathSepar();
+          AddCommand(kExtractEach, mainString, cmi);
           MyInsertMenu(popupMenu, subIndex++, currentCommandID++, mainString, bitmap);
         }
 
@@ -914,6 +927,14 @@ Z7_COMWF_B CZipContextMenu::QueryContextMenu(HMENU hMenu, UINT indexMenu,
       MyInsertMenu(popupMenu, subIndex++, currentCommandID++, mainString, bitmap);
     }
 
+
+    if ((contextMenuFlags & NContextMenuFlags::kCompressEach) != 0)
+    {
+      CCommandMapItem cmi;
+      cmi.Folder = _dropMode ? _dropPath : fs2us(folderPrefix);
+      AddCommand(kCompressEach, mainString, cmi);
+      MyInsertMenu(popupMenu, subIndex++, currentCommandID++, mainString, bitmap);
+    }
 
     // CompressTo7z
     if (contextMenuFlags & NContextMenuFlags::kCompressTo7z &&
@@ -1226,6 +1247,7 @@ HRESULT CZipContextMenu::InvokeCommandCommon(const CCommandMapItem &cmi)
       case kExtract:
       case kExtractHere:
       case kExtractTo:
+      case kExtractEach:
       {
         if (_attribs.FirstDirIndex != -1)
         {
@@ -1242,6 +1264,11 @@ HRESULT CZipContextMenu::InvokeCommandCommon(const CCommandMapItem &cmi)
       case kTest:
       {
         TestArchives(_fileNames);
+        break;
+      }
+      case kCompressEach:
+      {
+        CompressFilesEach(cmi.Folder, _fileNames);
         break;
       }
       case kCompress:

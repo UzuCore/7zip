@@ -17,6 +17,8 @@ namespace NContextMenuFlags
   const UInt32 kCompressTo7z = 1 << 9;
   // Bits 10, 11 and 13 are reserved for removed mail commands.
   const UInt32 kCompressToZip = 1 << 12;
+  const UInt32 kCompressEach = 1 << 14;
+  const UInt32 kExtractEach = 1 << 15;
 
   const UInt32 kCRC_Cascaded = (UInt32)1 << 30;
   const UInt32 kCRC = (UInt32)1 << 31;

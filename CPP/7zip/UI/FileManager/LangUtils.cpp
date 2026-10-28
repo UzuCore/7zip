@@ -345,3 +345,10 @@ UString LangString_Compress()
     return UString(L"\uc555\ucd95 \ud558\uae30...");
   return LangString(IDS_CONTEXT_COMPRESS);
 }
+
+UString LangString_Each(bool compress)
+{
+  if (g_LangID.IsEqualTo_Ascii_NoCase("ko"))
+    return UString(compress ? L"\uac01 \ud30c\uc77c/\ud3f4\ub354\uba85\uc73c\ub85c \uc555\ucd95\ud558\uae30" : L"\uac01 \ud30c\uc77c\uba85\uc73c\ub85c \uc555\ucd95\ud480\uae30");
+  return LangString(compress ? IDS_CONTEXT_COMPRESS_EACH : IDS_CONTEXT_EXTRACT_EACH);
+}

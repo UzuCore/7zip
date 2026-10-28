@@ -8,6 +8,9 @@
 #define IDS_CONTEXT_EXTRACT_TO          2327
 #define IDS_CONTEXT_COMPRESS_TO         2328
 
+#define IDS_CONTEXT_COMPRESS_EACH       2340
+#define IDS_CONTEXT_EXTRACT_EACH        2341
+
 #define IDS_SELECT_FILES                3015
 
 #define IDB_MENU_LOGO  190

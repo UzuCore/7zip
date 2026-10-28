@@ -235,6 +235,22 @@ HRESULT CompressFiles(
   MY_TRY_FINISH
 }
 
+HRESULT CompressFilesEach(const UString &outFolder, const UStringVector &names)
+{
+  MY_TRY_BEGIN
+  UString params ("a-each -tzip -sae");
+  CFileMapping fileMapping;
+  NSynchronization::CManualResetEvent event;
+  params += " -iw-";
+  RINOK(CreateMap(names, fileMapping, event, params))
+  AddLagePagesSwitch(params);
+  params += kStopSwitchParsing;
+  params.Add_Space();
+  params += GetQuotedString(outFolder);
+  return Call7zGui(params, false, &event);
+  MY_TRY_FINISH
+}
+
 static void ExtractGroupCommand(const UStringVector &arcPaths, UString &params, bool isHash)
 {
   AddLagePagesSwitch(params);

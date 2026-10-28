@@ -53,3 +53,24 @@ so its architecture is checked without claiming a runtime test on ARM hardware.
 WiX builds validate generated explicit components for every runtime resource.
 Actual Explorer interactions, UAC installation and uninstall must also be checked
 on disposable Windows machines; CI packaging checks do not substitute for these.
+
+### Per-item Explorer commands
+
+The Windows shell menu and its options include **Compress each file/folder to
+ZIP** and **Extract each archive to its own folder**, enabled by default for new
+settings. Existing custom menu selections can enable them in Options > 7-Zip.
+The compression command produces one ZIP per selected item, using the file stem
+or full folder name, beside the source items (or in the drag-and-drop target).
+Existing output archives are preserved; collisions receive ` (2)`, ` (3)`, etc.
+A GUI worker processes the entire selection sequentially, including selections
+over 16 items, and stops on cancellation or failure. Extraction uses the existing
+archive-name output-folder mode, retaining the normal password, overwrite, and
+error dialogs. It does not remove a matching top-level folder inside the archive.
+
+Local Windows x64 validation: built 7zG, 7zFM and the Explorer DLL; invoked both
+shell extension commands via COM with temporary files, including 20 selected
+items, Unicode/spaces, matching file stems, existing output preservation, nested
+folders, and ZIP/7z/ALZ/EGG extraction. These checks did not install the extension
+or automate a physical Explorer right-click. The installed Bandizip Korean and
+English language files supplied menu semantics; native decompilation was unavailable
+because no analysis engine was configured.
