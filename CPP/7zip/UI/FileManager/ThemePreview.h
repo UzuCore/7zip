@@ -282,7 +282,10 @@ static LRESULT CALLBACK ChildProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp,
     UINT_PTR id, DWORD_PTR data)
 {
   if (msg == WM_NCDESTROY)
+  {
+    RemovePropW(wnd, L"7zip.ThemePreview.ToolbarDivider");
     RemoveWindowSubclass(wnd, ChildProc, id);
+  }
   if (g_Dark)
   {
     if (msg == WM_CTLCOLOREDIT || msg == WM_CTLCOLORLISTBOX || msg == WM_CTLCOLORSTATIC)
@@ -415,7 +418,25 @@ static BOOL CALLBACK ApplyChild(HWND wnd, LPARAM)
     SetTheme(wnd, g_Dark ? L"" : L"Explorer");
   }
   else if (lstrcmpiW(name, TOOLBARCLASSNAMEW) == 0)
+  {
+    // The native toolbar draws a bright 3D divider even with custom colors.
+    // Preserve its original style so Light mode restores the normal separator.
+    LONG_PTR style = GetWindowLongPtr(wnd, GWL_STYLE);
+    HANDLE original = GetPropW(wnd, L"7zip.ThemePreview.ToolbarDivider");
+    if (!original)
+    {
+      original = (HANDLE)(UINT_PTR)((style & CCS_NODIVIDER) ? 2 : 1);
+      SetPropW(wnd, L"7zip.ThemePreview.ToolbarDivider", original);
+    }
+    if (g_Dark || (UINT_PTR)original == 2)
+      style |= CCS_NODIVIDER;
+    else
+      style &= ~(LONG_PTR)CCS_NODIVIDER;
+    SetWindowLongPtr(wnd, GWL_STYLE, style);
+    SetWindowPos(wnd, NULL, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     SetTheme(wnd, g_Dark ? L"" : L"Explorer");
+  }
   else if (lstrcmpiW(name, L"Edit") == 0 || lstrcmpiW(name, L"ComboBox") == 0
       || lstrcmpiW(name, L"ComboBoxEx32") == 0)
   {
@@ -477,6 +498,32 @@ static void Apply(HWND wnd)
   g_Applying = false;
 }
 
+// DefWindowProc draws a system-colored non-client separator below the menu.
+// Repaint only that strip, using the actual menu/client coordinates so it also
+// follows menu wrapping, window resizing and the current display scale.
+static void PaintMenuSeparator(HWND wnd, HDC printDC)
+{
+  if (!g_Dark || !g_Surface || !GetMenu(wnd)) return;
+  MENUBARINFO bar; ZeroMemory(&bar, sizeof(bar)); bar.cbSize = sizeof(bar);
+  RECT window, client;
+  POINT origin = { 0, 0 };
+  if (!GetMenuBarInfo(wnd, OBJID_MENU, 0, &bar)
+      || !GetWindowRect(wnd, &window) || !GetClientRect(wnd, &client)
+      || !ClientToScreen(wnd, &origin)) return;
+  RECT strip;
+  strip.left = origin.x - window.left;
+  strip.right = strip.left + client.right;
+  strip.top = bar.rcBar.bottom - window.top - 1;
+  strip.bottom = origin.y - window.top;
+  if (strip.bottom <= strip.top) return;
+  HDC dc = printDC ? printDC : GetWindowDC(wnd);
+  if (dc)
+  {
+    FillRect(dc, &strip, g_Surface);
+    if (!printDC) ReleaseDC(wnd, dc);
+  }
+}
+
 static LRESULT CALLBACK MainProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp,
     UINT_PTR id, DWORD_PTR)
 {
@@ -529,6 +576,13 @@ static LRESULT CALLBACK MainProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp,
     RECT rc; GetClientRect(wnd, &rc);
     FillRect((HDC)wp, &rc, g_Surface);
     return 1;
+  }
+  if (g_Dark && (msg == WM_NCPAINT || msg == WM_NCACTIVATE
+      || (msg == WM_PRINT && (lp & PRF_NONCLIENT))))
+  {
+    const LRESULT result = DefSubclassProc(wnd, msg, wp, lp);
+    PaintMenuSeparator(wnd, msg == WM_PRINT ? (HDC)wp : NULL);
+    return result;
   }
   if (msg == WM_NCDESTROY)
   {
