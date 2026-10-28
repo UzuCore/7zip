@@ -1223,7 +1223,7 @@ namespace NAlz {
 static IInArchive *CreateAlzIn() { return new NAlzEgg::CHandler(false); }
 static IOutArchive *CreateAlzOut() { return new NAlzEgg::CHandler(false); }
 
-REGISTER_ARC_R("ALZ", "alz", NULL, 0xE6, Z7_ARRAY_SIZE(kSigAlz), kSigAlz,
+REGISTER_ARC_R("alz", "alz", NULL, 0xE6, Z7_ARRAY_SIZE(kSigAlz), kSigAlz,
     0, 0, 0, CreateAlzIn, CreateAlzOut, NULL)
 
 }
@@ -1232,7 +1232,7 @@ namespace NEgg {
 static IInArchive *CreateEggIn() { return new NAlzEgg::CHandler(true); }
 static IOutArchive *CreateEggOut() { return new NAlzEgg::CHandler(true); }
 
-REGISTER_ARC_R("EGG", "egg", NULL, 0xE8, Z7_ARRAY_SIZE(kSigEgg), kSigEgg,
+REGISTER_ARC_R("egg", "egg", NULL, 0xE8, Z7_ARRAY_SIZE(kSigEgg), kSigEgg,
     0, 0, 0, CreateEggIn, CreateEggOut, NULL)
 
 }}
