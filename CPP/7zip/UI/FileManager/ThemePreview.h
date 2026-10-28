@@ -19,6 +19,229 @@ static COLORREF Back() { return g_Dark ? RGB(26, 28, 32) : GetSysColor(COLOR_WIN
 static COLORREF Surface() { return g_Dark ? RGB(36, 39, 44) : GetSysColor(COLOR_BTNFACE); }
 static COLORREF Text() { return g_Dark ? RGB(232, 234, 238) : GetSysColor(COLOR_WINDOWTEXT); }
 
+// Preserve native strings and command IDs so menu commands and accessibility
+// continue to work when toggling themes or rebuilding dynamic menus.
+struct CMenuPaintItem
+{
+  // MSAAMENUINFO-compatible prefix for screen readers.
+  DWORD Signature;
+  DWORD TextLength;
+  LPWSTR AccessibleText;
+  HMENU Menu;
+  UINT Position;
+  UINT Type;
+  ULONG_PTR Data;
+  UString Label;
+  bool Bar;
+  bool Submenu;
+};
+struct CMenuBackground
+{
+  HMENU Menu;
+  HBRUSH Brush;
+};
+static CObjectVector<CMenuPaintItem> g_MenuItems;
+static CRecordVector<CMenuBackground> g_MenuBackgrounds;
+static HFONT g_MenuFont = NULL;
+
+static CMenuPaintItem *FindMenuItem(ULONG_PTR data)
+{
+  FOR_VECTOR (i, g_MenuItems)
+    if ((ULONG_PTR)&g_MenuItems[i] == data)
+      return &g_MenuItems[i];
+  return NULL;
+}
+
+static void RestoreMenus()
+{
+  FOR_VECTOR (i, g_MenuItems)
+  {
+    CMenuPaintItem &item = g_MenuItems[i];
+    MENUITEMINFOW info; ZeroMemory(&info, sizeof(info)); info.cbSize = sizeof(info);
+    info.fMask = MIIM_DATA;
+    if (IsMenu(item.Menu) && GetMenuItemInfoW(item.Menu, item.Position, TRUE, &info)
+        && info.dwItemData == (ULONG_PTR)&item)
+    {
+      info.fMask = MIIM_FTYPE | MIIM_DATA | MIIM_STRING;
+      info.fType = item.Type; info.dwItemData = item.Data;
+      info.dwTypeData = (LPWSTR)item.Label.Ptr();
+      SetMenuItemInfoW(item.Menu, item.Position, TRUE, &info);
+    }
+  }
+  FOR_VECTOR (i, g_MenuBackgrounds)
+  {
+    const CMenuBackground &bg = g_MenuBackgrounds[i];
+    MENUINFO info; ZeroMemory(&info, sizeof(info)); info.cbSize = sizeof(info);
+    info.fMask = MIM_BACKGROUND;
+    if (IsMenu(bg.Menu) && GetMenuInfo(bg.Menu, &info) && info.hbrBack == g_Surface)
+    {
+      info.hbrBack = bg.Brush;
+      SetMenuInfo(bg.Menu, &info);
+    }
+  }
+  g_MenuItems.Clear();
+  g_MenuBackgrounds.Clear();
+}
+
+static void PaintMenus(HMENU menu, bool bar)
+{
+  if (!menu || !g_Dark) return;
+  MENUINFO bg; ZeroMemory(&bg, sizeof(bg)); bg.cbSize = sizeof(bg); bg.fMask = MIM_BACKGROUND;
+  if (GetMenuInfo(menu, &bg))
+  {
+    CMenuBackground saved; saved.Menu = menu; saved.Brush = bg.hbrBack;
+    g_MenuBackgrounds.Add(saved);
+    bg.hbrBack = g_Surface;
+    SetMenuInfo(menu, &bg);
+  }
+  const int count = GetMenuItemCount(menu);
+  for (int i = 0; i < count; i++)
+  {
+    MENUITEMINFOW info; ZeroMemory(&info, sizeof(info)); info.cbSize = sizeof(info);
+    info.fMask = MIIM_FTYPE | MIIM_DATA | MIIM_STRING | MIIM_SUBMENU;
+    if (!GetMenuItemInfoW(menu, (UINT)i, TRUE, &info)) continue;
+    const HMENU sub = info.hSubMenu;
+    // Leave external owner-draw handlers in control of their own items.
+    if (!(info.fType & MFT_OWNERDRAW))
+    {
+      CMenuPaintItem &item = g_MenuItems.AddNew();
+      item.Menu = menu; item.Position = (UINT)i; item.Type = info.fType;
+      item.Data = info.dwItemData; item.Bar = bar; item.Submenu = sub != NULL;
+      const unsigned len = info.cch;
+      info.dwTypeData = item.Label.GetBuf(len + 1); info.cch = len + 1;
+      GetMenuItemInfoW(menu, (UINT)i, TRUE, &info);
+      item.Label.ReleaseBuf_CalcLen(len);
+      item.Signature = 0xAA0DF00D;
+      item.TextLength = item.Label.Len(); item.AccessibleText = (LPWSTR)item.Label.Ptr();
+      info.fMask = MIIM_FTYPE | MIIM_DATA;
+      info.fType = item.Type | MFT_OWNERDRAW; info.dwItemData = (ULONG_PTR)&item;
+      SetMenuItemInfoW(menu, (UINT)i, TRUE, &info);
+    }
+    PaintMenus(sub, false);
+  }
+}
+
+static HFONT MenuFont()
+{
+  if (!g_MenuFont)
+  {
+    NONCLIENTMETRICSW metrics; ZeroMemory(&metrics, sizeof(metrics)); metrics.cbSize = sizeof(metrics);
+    if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0))
+      g_MenuFont = CreateFontIndirectW(&metrics.lfMenuFont);
+  }
+  return g_MenuFont;
+}
+
+static bool MeasureMenu(MEASUREITEMSTRUCT *measure)
+{
+  if (measure->CtlType != ODT_MENU) return false;
+  const CMenuPaintItem *item = FindMenuItem(measure->itemData);
+  if (!item) return false;
+  if (item->Type & MFT_SEPARATOR)
+  {
+    measure->itemWidth = 0; measure->itemHeight = 9;
+    return true;
+  }
+  HDC dc = GetDC(NULL);
+  const int saved = SaveDC(dc);
+  if (MenuFont()) SelectObject(dc, g_MenuFont);
+  RECT rc = {0, 0, 0, 0};
+  DrawTextW(dc, item->Label.Ptr(), -1, &rc, DT_CALCRECT | DT_SINGLELINE);
+  measure->itemWidth = (UINT)(rc.right + (item->Bar ? 18 : 76));
+  measure->itemHeight = (UINT)MyMax((int)(rc.bottom + (item->Bar ? 2 : 8)), GetSystemMetrics(SM_CYMENU));
+  RestoreDC(dc, saved); ReleaseDC(NULL, dc);
+  return true;
+}
+
+static bool DrawMenu(DRAWITEMSTRUCT *draw)
+{
+  if (draw->CtlType != ODT_MENU) return false;
+  const CMenuPaintItem *item = FindMenuItem(draw->itemData);
+  if (!item) return false;
+  HDC dc = draw->hDC;
+  const int saved = SaveDC(dc);
+  const bool selected = (draw->itemState & (ODS_SELECTED | ODS_HOTLIGHT)) != 0;
+  const bool disabled = (draw->itemState & (ODS_DISABLED | ODS_GRAYED)) != 0;
+  SetDCBrushColor(dc, selected ? RGB(57, 65, 80) : Surface());
+  FillRect(dc, &draw->rcItem, (HBRUSH)GetStockObject(DC_BRUSH));
+  if (item->Type & MFT_SEPARATOR)
+  {
+    RECT rc = draw->rcItem; rc.left += 30; rc.right -= 8;
+    rc.top = (rc.top + rc.bottom) / 2; rc.bottom = rc.top + 1;
+    SetDCBrushColor(dc, RGB(65, 68, 74));
+    FillRect(dc, &rc, (HBRUSH)GetStockObject(DC_BRUSH));
+  }
+  else
+  {
+    if (MenuFont()) SelectObject(dc, g_MenuFont);
+    const COLORREF color = disabled ? RGB(137, 141, 150) : Text();
+    SetTextColor(dc, color); SetBkMode(dc, TRANSPARENT);
+    RECT rc = draw->rcItem;
+    rc.left += item->Bar ? 9 : 30;
+    rc.right -= item->Bar ? 9 : 24;
+    UINT flags = DT_SINGLELINE | DT_VCENTER;
+    if (draw->itemState & ODS_NOACCEL) flags |= DT_HIDEPREFIX;
+    const int tab = item->Label.Find(L'\t');
+    if (tab >= 0)
+    {
+      DrawTextW(dc, item->Label.Ptr(), tab, &rc, flags | DT_LEFT);
+      DrawTextW(dc, item->Label.Ptr((unsigned)tab + 1), -1, &rc, flags | DT_RIGHT);
+    }
+    else
+      DrawTextW(dc, item->Label.Ptr(), -1, &rc, flags | (item->Bar ? DT_CENTER : DT_LEFT));
+    if (draw->itemState & ODS_CHECKED)
+    {
+      RECT check = draw->rcItem; check.left += 7; check.right = check.left + 16;
+      DrawTextW(dc, (item->Type & MFT_RADIOCHECK) ? L"\x2022" : L"\x2713", 1,
+          &check, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    }
+    if (item->Submenu && !item->Bar)
+    {
+      RECT arrow = draw->rcItem; arrow.left = arrow.right - 20;
+      DrawTextW(dc, L"\x203A", 1, &arrow, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    }
+  }
+  RestoreDC(dc, saved);
+  return true;
+}
+
+// Owner-drawn menu mnemonics are dispatched by Windows through WM_MENUCHAR.
+static LRESULT MenuChar(HMENU menu, wchar_t key)
+{
+  int first = -1, next = -1, selected = -1;
+  unsigned count = 0;
+  const int size = GetMenuItemCount(menu);
+  for (int i = 0; i < size; i++)
+  {
+    const UINT state = GetMenuState(menu, (UINT)i, MF_BYPOSITION);
+    if (state & MF_HILITE) selected = i;
+  }
+  for (int i = 0; i < size; i++)
+  {
+    MENUITEMINFOW info; ZeroMemory(&info, sizeof(info)); info.cbSize = sizeof(info);
+    info.fMask = MIIM_DATA | MIIM_STATE;
+    if (!GetMenuItemInfoW(menu, (UINT)i, TRUE, &info) || (info.fState & (MFS_DISABLED | MFS_GRAYED))) continue;
+    const CMenuPaintItem *item = FindMenuItem(info.dwItemData);
+    if (!item) continue;
+    for (unsigned j = 0; j + 1 < item->Label.Len(); j++)
+    {
+      if (item->Label[j] != L'&') continue;
+      if (item->Label[j + 1] == L'&') { j++; continue; }
+      wchar_t mnemonic[2] = { item->Label[j + 1], 0 };
+      wchar_t pressed[2] = { key, 0 };
+      if (lstrcmpiW(mnemonic, pressed) == 0)
+      {
+        if (first < 0) first = i;
+        if (next < 0 && i > selected) next = i;
+        count++;
+      }
+      break;
+    }
+  }
+  if (!count) return MAKELRESULT(0, MNC_IGNORE);
+  return MAKELRESULT(next >= 0 ? next : first, count > 1 ? MNC_SELECT : MNC_EXECUTE);
+}
+
 static void SetTheme(HWND wnd, const wchar_t *name)
 {
   typedef HRESULT (WINAPI *F)(HWND, LPCWSTR, LPCWSTR);
@@ -221,13 +444,14 @@ static void EnsureMenu(HWND wnd)
     AppendMenuW(main, MF_POPUP, (UINT_PTR)g_Menu, ko ? L"\ud14c\ub9c8 (\ubbf8\ub9ac\ubcf4\uae30)" : L"Theme (preview)");
   }
   CheckMenuRadioItem(g_Menu, kFirstCommand, kFirstCommand + 2, kFirstCommand + g_Mode, MF_BYCOMMAND);
-  DrawMenuBar(wnd);
 }
+
 
 static void Apply(HWND wnd)
 {
   if (g_Applying) return;
   g_Applying = true;
+  RestoreMenus();
   g_Dark = !IsHighContrast() && (g_Mode == 2 || (g_Mode == 0 && SystemDark()));
   // Children redraw after all brushes have been replaced on the UI thread.
   if (g_Back) DeleteObject(g_Back);
@@ -247,6 +471,8 @@ static void Apply(HWND wnd)
   }
   EnumChildWindows(wnd, ApplyChild, 0);
   EnsureMenu(wnd);
+  PaintMenus(GetMenu(wnd), true);
+  DrawMenuBar(wnd);
   RedrawWindow(wnd, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME);
   g_Applying = false;
 }
@@ -278,8 +504,21 @@ static LRESULT CALLBACK MainProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp,
   if (msg == WM_SETTINGCHANGE || msg == WM_SYSCOLORCHANGE
       || (msg == WM_PARENTNOTIFY && LOWORD(wp) == WM_CREATE))
     PostMessage(wnd, kRefresh, 0, 0);
-  if (msg == WM_INITMENU)
+  if (msg == WM_MEASUREITEM && MeasureMenu((MEASUREITEMSTRUCT *)lp))
+    return TRUE;
+  if (msg == WM_DRAWITEM && DrawMenu((DRAWITEMSTRUCT *)lp))
+    return TRUE;
+  if (g_Dark && msg == WM_MENUCHAR)
+    return MenuChar((HMENU)lp, (wchar_t)LOWORD(wp));
+  if (msg == WM_INITMENU || msg == WM_INITMENUPOPUP)
+  {
+    // Dynamic menu code must see the original native strings and item data.
+    RestoreMenus();
+    const LRESULT result = DefSubclassProc(wnd, msg, wp, lp);
     EnsureMenu(wnd);
+    PaintMenus(GetMenu(wnd), true);
+    return result;
+  }
   if (msg == kRefresh)
   {
     Apply(wnd);
@@ -293,6 +532,8 @@ static LRESULT CALLBACK MainProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp,
   }
   if (msg == WM_NCDESTROY)
   {
+    RestoreMenus();
+    if (g_MenuFont) { DeleteObject(g_MenuFont); g_MenuFont = NULL; }
     RemoveWindowSubclass(wnd, MainProc, id);
     if (g_Back) { DeleteObject(g_Back); g_Back = NULL; }
     if (g_Surface) { DeleteObject(g_Surface); g_Surface = NULL; }
