@@ -19,8 +19,8 @@ Visual Studio 2022, using a Windows build directory for MSVC compatibility.
 `Z7_UI_THEME` enables the dialog implementation only in the Windows MSVC GUI and
 File Manager makefiles. Other binaries and the Linux/macOS CLI builds retain
 their existing build settings. Native control styles and event handling remain
-in place; subclasses provide painting. Header dependencies support incremental
-rebuilds of theme changes.
+in place; subclasses provide painting. The upstream makefiles track source files rather than transitive header changes;
+use `nmake /A` after editing the theme headers or nested resource scripts.
 
 The preview preference is `HKCU\Software\7-Zip UzuCore\ThemePreview\Mode`:
 0 = System, 1 = Light, 2 = Dark.
@@ -46,3 +46,6 @@ This prototype has not received a multi-monitor / mixed-DPI test pass or native
 ARM64 runtime validation. Windows-owned file pickers and standard message boxes
 follow Windows behavior; they are not restyled by the application dialog layer.
 Installer/release integration remains separate from this local preview.
+
+See [UI-VISUAL-REVIEW.md](UI-VISUAL-REVIEW.md) for the 100% scaling visual audit,
+subsequent fixes and GUI archive-operation regression results.

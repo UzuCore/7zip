@@ -715,16 +715,19 @@ bool CPanel::OnCustomDraw(LPNMLVCUSTOMDRAW lplvcd, LRESULT &result)
     */
     const unsigned realIndex = (unsigned)lplvcd->nmcd.lItemlParam;
     lplvcd->clrTextBk = _listView.GetBkColor();
+    const COLORREF background = lplvcd->clrTextBk;
+    const bool darkColors = background != GetSysColor(COLOR_WINDOW)
+        && GetRValue(background) + GetGValue(background) + GetBValue(background) < 384;
     if (_mySelectMode)
     {
       if (realIndex != kParentIndex && _selectedStatusVector[realIndex])
-       lplvcd->clrTextBk = RGB(255, 192, 192);
+        lplvcd->clrTextBk = darkColors ? RGB(73, 49, 60) : RGB(255, 192, 192);
     }
 
     if (_markDeletedItems && _thereAreDeletedItems)
     {
       if (IsItem_Deleted(realIndex))
-        lplvcd->clrText = RGB(255, 0, 0);
+        lplvcd->clrText = darkColors ? RGB(255, 118, 118) : RGB(255, 0, 0);
     }
     // lplvcd->clrText = RGB(0, 0, 0);
     // result = CDRF_NEWFONT;

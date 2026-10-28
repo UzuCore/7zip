@@ -12,7 +12,7 @@
 #define ntPosX g5x2
 #define ntPosY m
 #define ntSizeX g5xs2
-#define precSizeX 76
+#define precSizeX 112
 
 #define ntSizeY 72
 #define timePosY (ntPosY + ntSizeY + 20)

@@ -147,6 +147,3 @@ C_OBJS = \
 !include "../../Sort.mak"
 
 !include "../../7zip.mak"
-
-# Rebuild the affected windows when editing the shared theme headers.
-$O\Dialog.obj: ../../../Windows/Control/DialogTheme.h

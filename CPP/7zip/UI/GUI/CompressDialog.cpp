@@ -3756,6 +3756,36 @@ bool COptionsDialog::OnInit()
   
   SetPrec();
 
+  #ifndef UNDER_CE
+  if (!cd->SymLinks.Supported && !cd->HardLinks.Supported
+      && !cd->AltStreams.Supported && !cd->NtSecurity.Supported)
+  {
+    // Remove the space reserved for the hidden NTFS group. Measure existing
+    // controls in pixels so the layout follows the dialog's font and scale.
+    RECT ntfs, timeInfo;
+    GetClientRectOfItem(IDG_COMPRESS_NTFS, ntfs);
+    GetClientRectOfItem(IDT_COMPRESS_TIME_INFO, timeInfo);
+    const int delta = timeInfo.top - ntfs.top;
+    if (delta > 0)
+    {
+      for (HWND child = ::GetWindow(*this, GW_CHILD); child;
+          child = ::GetWindow(child, GW_HWNDNEXT))
+      {
+        RECT rect;
+        ::GetWindowRect(child, &rect);
+        ::MapWindowPoints(NULL, *this, (POINT *)&rect, 2);
+        if (rect.top >= timeInfo.top)
+          ::SetWindowPos(child, NULL, rect.left, rect.top - delta, 0, 0,
+              SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+      }
+      RECT rect;
+      GetWindowRect(&rect);
+      ::SetWindowPos(*this, NULL, 0, 0, rect.right - rect.left,
+          rect.bottom - rect.top - delta, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+  }
+  #endif
+
   NormalizePosition();
 
   return CModalDialog::OnInit();
