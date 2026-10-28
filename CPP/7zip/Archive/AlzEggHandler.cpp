@@ -413,7 +413,8 @@ HRESULT CHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT *value) t
       const char *name = info->AsString(nest::key::file::name::NAME, &handled);
       if (handled && name)
       {
-        bool isUtf8 = false;
+        // The ALZ parser converts EUC-KR names to UTF-8; EGG uses its own UTF-8 flag.
+        bool isUtf8 = !_isEgg;
         if (_isEgg)
         {
           bool isUtf8Handled = false;
