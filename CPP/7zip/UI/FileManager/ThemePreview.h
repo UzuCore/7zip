@@ -491,17 +491,41 @@ static void EnsureMenu(HWND wnd)
 {
   HMENU main = GetMenu(wnd);
   if (!main) return;
+  HMENU tools = NULL;
+  int optionsPosition = -1;
+  for (int i = 0; i < GetMenuItemCount(main) && !tools; i++)
+  {
+    HMENU sub = GetSubMenu(main, i);
+    for (int j = 0; sub && j < GetMenuItemCount(sub); j++)
+      if (GetMenuItemID(sub, j) == IDM_OPTIONS)
+      {
+        tools = sub;
+        optionsPosition = j;
+        break;
+      }
+  }
+  if (!tools) return;
   bool found = false;
-  for (int i = 0; i < GetMenuItemCount(main); i++)
-    if (GetSubMenu(main, i) == g_Menu && g_Menu) found = true;
+  for (int i = 0; i < GetMenuItemCount(tools); i++)
+    if (GetSubMenu(tools, i) == g_Menu && g_Menu) found = true;
   if (!found)
   {
-    g_Menu = CreatePopupMenu();
+    HMENU menu = CreatePopupMenu();
+    if (!menu) return;
     const bool ko = g_LangID.IsEqualTo_Ascii_NoCase("ko");
-    AppendMenuW(g_Menu, MF_STRING, kFirstCommand, ko ? L"\uc2dc\uc2a4\ud15c \uc124\uc815 \ub530\ub974\uae30" : L"System default");
-    AppendMenuW(g_Menu, MF_STRING, kFirstCommand + 1, ko ? L"\ub77c\uc774\ud2b8" : L"Light");
-    AppendMenuW(g_Menu, MF_STRING, kFirstCommand + 2, ko ? L"\ub2e4\ud06c" : L"Dark");
-    AppendMenuW(main, MF_POPUP, (UINT_PTR)g_Menu, ko ? L"\ud14c\ub9c8 (\ubbf8\ub9ac\ubcf4\uae30)" : L"Theme (preview)");
+    AppendMenuW(menu, MF_STRING, kFirstCommand, ko ? L"\uc2dc\uc2a4\ud15c \uc124\uc815 \ub530\ub974\uae30" : L"System default");
+    AppendMenuW(menu, MF_STRING, kFirstCommand + 1, ko ? L"\ub77c\uc774\ud2b8" : L"Light");
+    AppendMenuW(menu, MF_STRING, kFirstCommand + 2, ko ? L"\ub2e4\ud06c" : L"Dark");
+    MENUITEMINFOW item; ZeroMemory(&item, sizeof(item)); item.cbSize = sizeof(item);
+    item.fMask = MIIM_FTYPE | MIIM_STRING | MIIM_SUBMENU | MIIM_ID;
+    item.fType = MFT_STRING; item.hSubMenu = menu; item.wID = kFirstCommand + 10;
+    item.dwTypeData = (LPWSTR)(ko ? L"\ud14c\ub9c8(&T)" : L"&Theme");
+    if (!InsertMenuItemW(tools, (UINT)(optionsPosition + 1), TRUE, &item))
+    {
+      DestroyMenu(menu);
+      return;
+    }
+    g_Menu = menu;
   }
   CheckMenuRadioItem(g_Menu, kFirstCommand, kFirstCommand + 2, kFirstCommand + g_Mode, MF_BYCOMMAND);
 }

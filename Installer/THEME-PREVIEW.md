@@ -49,3 +49,8 @@ Installer/release integration remains separate from this local preview.
 
 See [UI-VISUAL-REVIEW.md](UI-VISUAL-REVIEW.md) for the 100% scaling visual audit,
 subsequent fixes and GUI archive-operation regression results.
+
+Theme selection is under **Tools > Theme**, directly below **Options**.
+The default is **System default** (Mode = 0); an explicit Light/Dark choice is saved.
+Menu placement, repeated submenu opening and System-mode persistence across restart
+were verified in the local Windows preview.
