@@ -30,7 +30,7 @@ elif a.platform=="linux":
     elf=subprocess.check_output(["readelf","-l",str(root/"7zzs")],text=True)
     assert "INTERP" not in elf, "7zzs must be statically linked"
 else:
-    subprocess.run(["lipo","-verify_arch","x86_64" if a.arch=="x64" else "arm64",str(root/"7zz")],check=True)
+    subprocess.run(["lipo",str(root/"7zz"),"-verify_arch","x86_64" if a.arch=="x64" else "arm64"],check=True)
 if not a.skip_run:
     for name in programs:
         with tempfile.TemporaryDirectory() as work:
