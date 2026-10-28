@@ -336,6 +336,6 @@ void ReloadLang()
 UString LangString_CompressTo(bool isZip)
 {
   if (g_LangID.IsEqualTo_Ascii_NoCase("ko"))
-    return UString(isZip ? L"{0}\uc73c\ub85c \uc555\ucd95" : L"{0}\ub85c \uc555\ucd95");
+    return UString(isZip ? L"{0} \uc73c\ub85c \uc555\ucd95" : L"{0} \ub85c \uc555\ucd95");
   return LangString(IDS_CONTEXT_COMPRESS_TO);
 }
