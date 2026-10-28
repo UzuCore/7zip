@@ -520,6 +520,15 @@ static void PaintMenuSeparator(HWND wnd, HDC printDC)
   if (dc)
   {
     FillRect(dc, &strip, g_Surface);
+    // Keep a quiet, single-pixel boundary between the menu and toolbar.
+    RECT line = strip;
+    line.top = line.bottom - 1;
+    HBRUSH divider = CreateSolidBrush(RGB(76, 80, 88));
+    if (divider)
+    {
+      FillRect(dc, &line, divider);
+      DeleteObject(divider);
+    }
     if (!printDC) ReleaseDC(wnd, dc);
   }
 }
