@@ -13,7 +13,7 @@ HRESULT CompressFiles(
     const UString &arcType,
     bool addExtension,
     const UStringVector &names,
-    bool email, bool showDialog, bool waitFinish);
+    bool showDialog, bool waitFinish);
 
 void ExtractArchives(const UStringVector &arcPaths, const UString &outFolder, bool showDialog, bool elimDup, UInt32 writeZone);
 void TestArchives(const UStringVector &arcPaths, bool hashMode = false);

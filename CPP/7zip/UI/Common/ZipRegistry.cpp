@@ -572,15 +572,7 @@ void CContextMenuInfo::Load()
 
   WriteZone = (UInt32)(Int32)-1;
 
-  /* we can disable email items by default,
-     because email code doesn't work in some systems */
-  Flags = (UInt32)(Int32)-1
-      /*
-      & ~NContextMenuFlags::kCompressEmail
-      & ~NContextMenuFlags::kCompressTo7zEmail
-      & ~NContextMenuFlags::kCompressToZipEmail
-      */
-      ;
+  Flags = (UInt32)(Int32)-1;
   Flags_Def = false;
   
   CS_LOCK

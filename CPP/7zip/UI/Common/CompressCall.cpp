@@ -38,7 +38,6 @@ using namespace NWindows;
 #define ISWITCH_NO_WILDCARD_POSTFIX
 
 #define kShowDialogSwitch  " -ad"
-#define kEmailSwitch  " -seml."
 #define kArchiveTypeSwitch  " -t"
 #define kIncludeSwitch  " -i" ISWITCH_NO_WILDCARD_POSTFIX
 #define kArcIncludeSwitches  " -an -ai" ISWITCH_NO_WILDCARD_POSTFIX
@@ -189,7 +188,7 @@ HRESULT CompressFiles(
     const UString &arcType,
     bool addExtension,
     const UStringVector &names,
-    bool email, bool showDialog, bool waitFinish)
+    bool showDialog, bool waitFinish)
 {
   MY_TRY_BEGIN
   UString params ('a');
@@ -204,9 +203,6 @@ HRESULT CompressFiles(
     params += kArchiveTypeSwitch;
     params += arcType;
   }
-
-  if (email)
-    params += kEmailSwitch;
 
   if (showDialog)
     params += kShowDialogSwitch;
@@ -304,7 +300,6 @@ void CalcChecksum(const UStringVector &paths,
       UString("hash"),
       false, // addExtension,
       paths,
-      false, // email,
       false, // showDialog,
       false  // waitFinish
       );

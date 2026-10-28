@@ -44,9 +44,6 @@ using namespace NWindows;
 using namespace NFile;
 using namespace NDir;
 
-#ifndef UNDER_CE
-#define EMAIL_SUPPORT 1
-#endif
 
 extern LONG g_DllRefCount;
 
@@ -276,11 +273,8 @@ static const CContextMenuCommand g_Commands[] =
   CMD_REC( kExtractTo,   "ExtractTo",   IDS_CONTEXT_EXTRACT_TO),
   CMD_REC( kTest,        "Test",        IDS_CONTEXT_TEST),
   CMD_REC( kCompress,           "Compress",           IDS_CONTEXT_COMPRESS),
-  CMD_REC( kCompressEmail,      "CompressEmail",      IDS_CONTEXT_COMPRESS_EMAIL),
   CMD_REC( kCompressTo7z,       "CompressTo7z",       IDS_CONTEXT_COMPRESS_TO),
-  CMD_REC( kCompressTo7zEmail,  "CompressTo7zEmail",  IDS_CONTEXT_COMPRESS_TO_EMAIL),
   CMD_REC( kCompressToZip,      "CompressToZip",      IDS_CONTEXT_COMPRESS_TO),
-  CMD_REC( kCompressToZipEmail, "CompressToZipEmail", IDS_CONTEXT_COMPRESS_TO_EMAIL)
 };
 
 
@@ -726,17 +720,6 @@ Z7_COMWF_B CZipContextMenu::QueryContextMenu(HMENU hMenu, UINT indexMenu,
     fileNames = &fileNames_Reduced;
   }
   
-  /*
-  if (_fileNames.Size() == k_Explorer_NumReducedItems) // for debug
-  {
-    for (int i = 0; i < 10; i++)
-    {
-      CCommandMapItem cmi;
-      AddCommand(kCompressToZipEmail, mainString, cmi);
-      MyInsertMenu(popupMenu, subIndex++, currentCommandID++, mainString, bitmap);
-    }
-  }
-  */
 
   if (_fileNames.Size() == 1 && currentCommandID + 14 <= commandIDLast)
   {
@@ -926,16 +909,6 @@ Z7_COMWF_B CZipContextMenu::QueryContextMenu(HMENU hMenu, UINT indexMenu,
       MyInsertMenu(popupMenu, subIndex++, currentCommandID++, mainString, bitmap);
     }
 
-    #ifdef EMAIL_SUPPORT
-    // CompressEmail
-    if ((contextMenuFlags & NContextMenuFlags::kCompressEmail) != 0 && !_dropMode)
-    {
-      CCommandMapItem cmi;
-      cmi.ArcName = arcName;
-      AddCommand(kCompressEmail, mainString, cmi);
-      MyInsertMenu(popupMenu, subIndex++, currentCommandID++, mainString, bitmap);
-    }
-    #endif
 
     // CompressTo7z
     if (contextMenuFlags & NContextMenuFlags::kCompressTo7z &&
@@ -955,20 +928,6 @@ Z7_COMWF_B CZipContextMenu::QueryContextMenu(HMENU hMenu, UINT indexMenu,
       MyInsertMenu(popupMenu, subIndex++, currentCommandID++, s, bitmap);
     }
 
-    #ifdef EMAIL_SUPPORT
-    // CompressTo7zEmail
-    if ((contextMenuFlags & NContextMenuFlags::kCompressTo7zEmail) != 0  && !_dropMode)
-    {
-      CCommandMapItem cmi;
-      UString s;
-      cmi.ArcName = arcName_7z;
-      cmi.ArcType = "7z";
-      AddCommand(kCompressTo7zEmail, s, cmi);
-      MyFormatNew_ReducedName(s, arcName_7z_Show);
-      Set_UserString_in_LastCommand(s);
-      MyInsertMenu(popupMenu, subIndex++, currentCommandID++, s, bitmap);
-    }
-    #endif
 
     // CompressToZip
     if (contextMenuFlags & NContextMenuFlags::kCompressToZip &&
@@ -988,20 +947,6 @@ Z7_COMWF_B CZipContextMenu::QueryContextMenu(HMENU hMenu, UINT indexMenu,
       MyInsertMenu(popupMenu, subIndex++, currentCommandID++, s, bitmap);
     }
 
-    #ifdef EMAIL_SUPPORT
-    // CompressToZipEmail
-    if ((contextMenuFlags & NContextMenuFlags::kCompressToZipEmail) != 0  && !_dropMode)
-    {
-      CCommandMapItem cmi;
-      UString s;
-      cmi.ArcName = arcName_zip;
-      cmi.ArcType = "zip";
-      AddCommand(kCompressToZipEmail, s, cmi);
-      MyFormatNew_ReducedName(s, arcName_zip_Show);
-      Set_UserString_in_LastCommand(s);
-      MyInsertMenu(popupMenu, subIndex++, currentCommandID++, s, bitmap);
-    }
-    #endif
   }
 
   ODS("### 300")
@@ -1295,11 +1240,8 @@ HRESULT CZipContextMenu::InvokeCommandCommon(const CCommandMapItem &cmi)
         break;
       }
       case kCompress:
-      case kCompressEmail:
       case kCompressTo7z:
-      case kCompressTo7zEmail:
       case kCompressToZip:
-      case kCompressToZipEmail:
       {
         UString arcName = cmi.ArcName;
         if (_fileNames_WereReduced)
@@ -1311,29 +1253,20 @@ HRESULT CZipContextMenu::InvokeCommandCommon(const CCommandMapItem &cmi)
               NULL, // fi0
               arcName_base);
           const char *postfix = NULL;
-          if (cmdID == kCompressTo7z ||
-              cmdID == kCompressTo7zEmail)
+          if (cmdID == kCompressTo7z)
             postfix = ".7z";
-          else if (
-              cmdID == kCompressToZip ||
-              cmdID == kCompressToZipEmail)
+          else if (cmdID == kCompressToZip)
             postfix = ".zip";
           if (postfix)
             arcName += postfix;
         }
 
-        const bool email =
-            cmdID == kCompressEmail ||
-            cmdID == kCompressTo7zEmail ||
-            cmdID == kCompressToZipEmail;
-        const bool showDialog =
-            cmdID == kCompress ||
-            cmdID == kCompressEmail;
+        const bool showDialog = (cmdID == kCompress);
         const bool addExtension = showDialog;
         CompressFiles(cmi.Folder,
             arcName, cmi.ArcType,
             addExtension,
-            _fileNames, email, showDialog,
+            _fileNames, showDialog,
             false // waitFinish
             );
         break;

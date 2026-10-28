@@ -2870,7 +2870,6 @@ void CPanel::CompressDropFiles(
         L"",      // arcType
         true,     // addExtension
         filePaths,
-        false,    // email
         true,     // showDialog
         needWait);
   }

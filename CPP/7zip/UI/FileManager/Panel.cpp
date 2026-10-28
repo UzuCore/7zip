@@ -946,7 +946,6 @@ void CPanel::AddToArchive()
   const HRESULT res = CompressFiles(destCurDirPrefix, arcName, L"",
       true,   // addExtension
       names,
-      false,  // email
       true,   // showDialog
       false); // waitFinish
   if (res != S_OK)

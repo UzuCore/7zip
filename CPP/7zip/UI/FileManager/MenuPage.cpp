@@ -60,11 +60,6 @@ static const CContextMenuItem kMenuItems[] =
   { IDS_CONTEXT_COMPRESS_TO, kCompressTo7z },
   { IDS_CONTEXT_COMPRESS_TO, kCompressToZip },
 
-  #ifndef UNDER_CE
-  { IDS_CONTEXT_COMPRESS_EMAIL, kCompressEmail },
-  { IDS_CONTEXT_COMPRESS_TO_EMAIL, kCompressTo7zEmail },
-  { IDS_CONTEXT_COMPRESS_TO_EMAIL, kCompressToZipEmail },
-  #endif
 
   { IDS_PROP_CHECKSUM, kCRC },
   { IDS_PROP_CHECKSUM, kCRC_Cascaded },
@@ -256,17 +251,14 @@ bool CMenuPage::OnInit()
         break;
       }
       case IDS_CONTEXT_COMPRESS_TO:
-      case IDS_CONTEXT_COMPRESS_TO_EMAIL:
       {
         UString s2 = LangString(IDS_CONTEXT_ARCHIVE);
         switch (menuItem.Flag)
         {
           case kCompressTo7z:
-          case kCompressTo7zEmail:
             s2 += (".7z");
             break;
           case kCompressToZip:
-          case kCompressToZipEmail:
             s2 += (".zip");
             break;
         }

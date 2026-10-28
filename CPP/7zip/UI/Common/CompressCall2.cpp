@@ -93,7 +93,7 @@ HRESULT CompressFiles(
     const UString &arcType,
     bool addExtension,
     const UStringVector &names,
-    bool email, bool showDialog, bool /* waitFinish */)
+    bool showDialog, bool /* waitFinish */)
 {
   MY_TRY_BEGIN
   
@@ -104,7 +104,6 @@ HRESULT CompressFiles(
   callback.Init();
 
   CUpdateOptions uo;
-  uo.EMailMode = email;
   uo.SetActionCommand_Add();
 
   uo.ArcNameMode = (addExtension ? k_ArcNameMode_Add : k_ArcNameMode_Exact);
@@ -261,7 +260,6 @@ void CalcChecksum(const UStringVector &paths,
       UString("hash"),
       false, // addExtension,
       paths,
-      false, // email,
       false, // showDialog,
       false  // waitFinish
       );

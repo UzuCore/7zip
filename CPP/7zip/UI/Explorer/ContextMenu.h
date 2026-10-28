@@ -80,12 +80,9 @@ public:
     kExtractTo,
     kTest,
     kCompress,
-    kCompressEmail,
-    kCompressTo7z,
-    kCompressTo7zEmail,
-    kCompressToZip,
-    kCompressToZipEmail,
-    kHash_CRC32,
+    kCompressTo7z = 8, // 7 and 9 were retired mail commands.
+    kCompressToZip = 10,
+    kHash_CRC32 = 12, // 11 was a retired mail command.
     kHash_CRC64,
     kHash_XXH64,
     kHash_MD5,
