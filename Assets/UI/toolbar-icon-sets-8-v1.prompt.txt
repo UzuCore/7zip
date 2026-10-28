@@ -1,0 +1,17 @@
+Tool: built-in image_gen
+
+Create ONE high-resolution PNG design comparison sheet for a modern Windows desktop archive manager, 7zip+alpha. The user's request is EIGHT DIFFERENT ICON SET DESIGNS to choose from. This is one comparison board, not an application screenshot.
+
+Canvas: tall portrait, ideally 2048 x 3072 pixels, clean very light cool gray background. Layout: exactly EIGHT horizontal rows, numbered 01 through 08 in the left margin. Each row is a complete matching toolbar icon family of exactly SEVEN icons. Every row uses precisely the same seven functions and order, left to right: COMPRESS (archive carton plus), EXTRACT (open archive with arrow coming out), TEST (archive with check), COPY (two documents), MOVE (document with right arrow), DELETE (trash bin), INFO (circle i). Total exactly 56 icons. Each row has uniform optical icon size, seven evenly spaced columns, generous margins and padding. All icons fully inside their cells, no cropped edges, no overlaps. Small column headings at the top read exactly "COMPRESS", "EXTRACT", "TEST", "COPY", "MOVE", "DELETE", "INFO". Row labels in the left margin read exactly "01 COLOR", "02 OUTLINE", "03 DUOTONE", "04 ROUNDED", "05 SOLID", "06 PIXEL", "07 SOFT 3D", "08 MINIMAL". Thin subtle horizontal dividers separate rows. No other text, logos, brands, watermark, decorative shapes or extra icons.
+
+The EIGHT rows must look distinctly different from one another, rather than mere recolorings:
+01 COLOR: polished contemporary Fluent-inspired flat filled icons, medium blue documents and info, warm amber archives, green action badges, red delete, restrained rounded geometry.
+02 OUTLINE: precise medium-weight charcoal outline icons with rounded caps, no colored fills, exceptionally clear at 24px.
+03 DUOTONE: elegant cobalt and pale blue duotone, consistent simple two-color shapes, no gradients.
+04 ROUNDED: friendly rounded filled shapes with restrained mint, sky blue, warm apricot and coral, crisp silhouettes and clear action symbols.
+05 SOLID: bold high-contrast single-color navy solid silhouettes, generous negative-space cutouts, strong compact toolbar readability.
+06 PIXEL: meticulously crafted contemporary pixel-art icons on a consistent pixel grid, crisp stepped edges, clean restrained classic utility-app palette, no blur or antialiasing.
+07 SOFT 3D: restrained premium softly beveled icon family, slight depth, coherent front three-quarter view, blue/amber/green/red colors, subtle lighting, no long shadows or floating backgrounds.
+08 MINIMAL: refined geometric thin-stroke blue-gray line icons with one restrained blue accent, minimal detail, lots of negative space, distinctly lighter visual weight than row02.
+
+Across every row the seven functions must remain unmistakable and consistent in metaphor. Especially distinguish copy from move, compress from extract, and test from delete. Intended for an archive application's toolbar at 24px and 32px, so avoid tiny ornamental details. Use crisp professional UI asset rendering, not a sketch, not photographs, not a website mockup. No paper texture, no app windows, no explanatory paragraphs.
