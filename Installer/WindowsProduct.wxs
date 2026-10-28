@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+      Name="$(var.ProductName)"
+      Manufacturer="UzuCore"
+      Version="$(var.PackageVersion)"
+      UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}"
+      Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of 7-Zip UzuCore is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="ARPCONTACT" Value="UzuCore" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/UzuCore/7zip" />
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+
+    <Feature Id="Complete" Title="$(var.ProductName)" Level="1">
+      <ComponentRef Id="SevenZipConsoleComponent" />
+      <ComponentRef Id="SevenZipFormatsComponent" />
+      <ComponentRef Id="SevenZipFileManagerComponent" />
+      <ComponentRef Id="LicenseTextComponent" />
+      <ComponentRef Id="CopyingTextComponent" />
+      <ComponentRef Id="UnRarLicenseTextComponent" />
+      <ComponentRef Id="UnEggLicenseTextComponent" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="7-Zip UzuCore">
+        <Component Id="SevenZipConsoleComponent" Guid="*">
+          <File Id="SevenZipConsole" Source="$(var.PayloadDir)\7zz.exe" KeyPath="yes" />
+        </Component>
+        <Component Id="SevenZipFormatsComponent" Guid="*">
+          <File Id="SevenZipFormats" Source="$(var.PayloadDir)\7z.dll" />
+        </Component>
+        <Component Id="SevenZipFileManagerComponent" Guid="*">
+          <File Id="SevenZipFileManager" Source="$(var.PayloadDir)\7zFM.exe" />
+        </Component>
+        <Component Id="LicenseTextComponent" Guid="*">
+          <File Id="LicenseText" Source="$(var.PayloadDir)\License.txt" />
+        </Component>
+        <Component Id="CopyingTextComponent" Guid="*">
+          <File Id="CopyingText" Source="$(var.PayloadDir)\copying.txt" />
+        </Component>
+        <Component Id="UnRarLicenseTextComponent" Guid="*">
+          <File Id="UnRarLicenseText" Source="$(var.PayloadDir)\unRarLicense.txt" />
+        </Component>
+        <Component Id="UnEggLicenseTextComponent" Guid="*">
+          <File Id="UnEggLicenseText" Source="$(var.PayloadDir)\UnEGG-LICENSE.txt" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationStartMenuFolder" Name="7-Zip UzuCore">
+        <Component Id="StartMenuShortcut" Guid="*">
+          <Shortcut Id="FileManagerShortcut"
+                    Name="7-Zip File Manager"
+                    Target="[#SevenZipFileManager]"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveStartMenuFolder" Directory="ApplicationStartMenuFolder" On="uninstall" />
+          <RegistryValue Root="HKLM" Key="Software\UzuCore\7-Zip" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+  </Package>
+</Wix>

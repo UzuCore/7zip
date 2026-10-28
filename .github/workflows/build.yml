@@ -110,6 +110,10 @@ jobs:
           if errorlevel 1 exit /b 1
           nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
           if errorlevel 1 exit /b 1
+          cd /d "%GITHUB_WORKSPACE%\CPP\7zip\Bundles\SFXSetup"
+          if errorlevel 1 exit /b 1
+          nmake /nologo /f makefile PLATFORM=%BUILD_ARCH%
+          if errorlevel 1 exit /b 1
           '@
           [IO.File]::WriteAllText($buildScript, $scriptText, [Text.Encoding]::ASCII)
 
@@ -153,6 +157,89 @@ jobs:
             Pop-Location
           }
           Move-Item -LiteralPath $portableArchive -Destination (Join-Path $artifactDir "7zip-windows-$env:BUILD_ARCH.7z")
+
+          $versionHeader = Get-Content (Join-Path $env:GITHUB_WORKSPACE 'C\7zVersion.h') -Raw
+          $versionMajor = [regex]::Match($versionHeader, '(?m)^#define MY_VER_MAJOR (\d+)').Groups[1].Value
+          $versionMinor = [regex]::Match($versionHeader, '(?m)^#define MY_VER_MINOR (\d+)').Groups[1].Value
+          if (-not $versionMajor -or -not $versionMinor) {
+            throw 'Could not read the product version from C/7zVersion.h.'
+          }
+          $packageVersion = "$versionMajor.$versionMinor.$env:GITHUB_RUN_NUMBER"
+          $wixDir = Join-Path $env:RUNNER_TEMP 'wix'
+          dotnet tool install --tool-path $wixDir wix --version 4.0.5
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not install WiX Toolset 4.0.5.'
+          }
+          $wix = Join-Path $wixDir 'wix.exe'
+          & $wix extension add --global WixToolset.UI.wixext/4.0.5
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not install the WiX standard installer dialogs.'
+          }
+
+          $licenseText = [IO.File]::ReadAllText((Join-Path $env:GITHUB_WORKSPACE 'DOC\License.txt'))
+          $licenseText = $licenseText.Replace('\', '\\').Replace('{', '\{').Replace('}', '\}')
+          $licenseText = [regex]::Replace($licenseText, "`r?`n", '\line ')
+          $licenseRtf = Join-Path $env:RUNNER_TEMP '7zip-license.rtf'
+          $licenseRtfText = "{\rtf1\ansi\deff0{\fonttbl{\f0\fnil Arial;}}\viewkind4\uc1\f0\fs18 $licenseText}"
+          [IO.File]::WriteAllText($licenseRtf, $licenseRtfText, [Text.Encoding]::ASCII)
+
+          $msiName = "7zip-windows-$env:BUILD_ARCH.msi"
+          $msiPath = Join-Path $artifactDir $msiName
+          & $wix build -arch $env:BUILD_ARCH `
+            -d "ProductName=7-Zip UzuCore ($env:BUILD_ARCH)" `
+            -d "PackageVersion=$packageVersion" `
+            -d "PayloadDir=$artifactDir" `
+            -d "LicenseRtf=$licenseRtf" `
+            -ext WixToolset.UI.wixext `
+            -o $msiPath `
+            (Join-Path $env:GITHUB_WORKSPACE 'Installer\WindowsProduct.wxs')
+          if ($LASTEXITCODE -ne 0) {
+            throw "WiX failed to build the $env:BUILD_ARCH installer MSI."
+          }
+
+          $setupSfx = Join-Path $env:GITHUB_WORKSPACE "CPP\7zip\Bundles\SFXSetup\$env:BUILD_ARCH\7zS.sfx"
+          if (-not (Test-Path -LiteralPath $setupSfx)) {
+            throw "The $env:BUILD_ARCH setup SFX module was not built: $setupSfx"
+          }
+          $setupPayload = Join-Path $env:RUNNER_TEMP "7zip-installer-$env:BUILD_ARCH"
+          New-Item -ItemType Directory -Force -Path $setupPayload | Out-Null
+          Copy-Item -LiteralPath $msiPath -Destination (Join-Path $setupPayload $msiName)
+          $setupArchive = Join-Path $env:RUNNER_TEMP "7zip-installer-$env:BUILD_ARCH.7z"
+          Push-Location $setupPayload
+          try {
+            & (Join-Path $artifactDir '7zz.exe') a -t7z $setupArchive $msiName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not package the $env:BUILD_ARCH MSI for the setup EXE."
+            }
+          }
+          finally {
+            Pop-Location
+          }
+
+          $setupConfig = Join-Path $env:RUNNER_TEMP "7zip-installer-$env:BUILD_ARCH-config.txt"
+          $setupConfigText = @"
+          ;!@Install@!UTF-8!
+          Title="7-Zip UzuCore Setup"
+          RunProgram="msiexec.exe /i $msiName"
+          ;!@InstallEnd@!
+          "@
+          [IO.File]::WriteAllText($setupConfig, $setupConfigText, [Text.Encoding]::ASCII)
+          $setupExe = Join-Path $artifactDir "7zip-windows-$env:BUILD_ARCH.exe"
+          $setupStream = [IO.File]::Create($setupExe)
+          try {
+            foreach ($sourceFile in @($setupSfx, $setupConfig, $setupArchive)) {
+              $sourceStream = [IO.File]::OpenRead($sourceFile)
+              try {
+                $sourceStream.CopyTo($setupStream)
+              }
+              finally {
+                $sourceStream.Dispose()
+              }
+            }
+          }
+          finally {
+            $setupStream.Dispose()
+          }
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v7
@@ -251,6 +338,8 @@ jobs:
                 ;;
               7zip-windows-*)
                 cp "$artifact_dir/${asset_name}.7z" "release/${asset_name}.7z"
+                cp "$artifact_dir/${asset_name}.exe" "release/${asset_name}.exe"
+                cp "$artifact_dir/${asset_name}.msi" "release/${asset_name}.msi"
                 ;;
               *)
                 echo "Unexpected build artifact: $asset_name" >&2
@@ -280,10 +369,10 @@ jobs:
             const path = require("path");
             const { owner, repo } = context.repo;
             const tag = process.env.RELEASE_TAG;
-            const files = fs.readdirSync("release").filter((file) => file.endsWith(".tar.xz") || file.endsWith(".7z")).sort();
+            const files = fs.readdirSync("release").filter((file) => file.endsWith(".tar.xz") || /\.(7z|exe|msi)$/.test(file)).sort();
 
-            if (files.length !== 6) {
-              throw new Error(`Expected 6 release archives, found ${files.length}: ${files.join(", ")}`);
+            if (files.length !== 10) {
+              throw new Error(`Expected 10 release assets, found ${files.length}: ${files.join(", ")}`);
             }
 
             let release;
@@ -329,7 +418,11 @@ jobs:
                 name: file,
                 data,
                 headers: {
-                  "content-type": file.endsWith(".tar.xz") ? "application/x-xz" : "application/x-7z-compressed",
+                  "content-type": file.endsWith(".tar.xz")
+                    ? "application/x-xz"
+                    : file.endsWith(".7z")
+                      ? "application/x-7z-compressed"
+                      : "application/octet-stream",
                   "content-length": data.length,
                 },
               });
