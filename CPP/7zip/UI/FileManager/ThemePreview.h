@@ -278,6 +278,38 @@ static bool IsHighContrast()
       && (hc.dwFlags & HCF_HIGHCONTRASTON) != 0;
 }
 
+static void PaintListBorder(HWND wnd, HDC printDC)
+{
+  if (!(GetWindowLongPtr(wnd, GWL_EXSTYLE) & WS_EX_CLIENTEDGE)) return;
+  RECT window;
+  POINT origin = { 0, 0 };
+  if (!GetWindowRect(wnd, &window) || !ClientToScreen(wnd, &origin)) return;
+  const int width = window.right - window.left;
+  const int height = window.bottom - window.top;
+  const int edgeX = origin.x - window.left;
+  const int edgeY = origin.y - window.top;
+  if (edgeX <= 0 || edgeY <= 0) return;
+  HDC dc = printDC ? printDC : GetWindowDC(wnd);
+  if (!dc) return;
+  // Only cover the non-client frame; keep native scrollbars and hit testing.
+  RECT sides[4] = {
+    { 0, 0, width, edgeY },
+    { 0, height - edgeY, width, height },
+    { 0, edgeY, edgeX, height - edgeY },
+    { width - edgeX, edgeY, width, height - edgeY }
+  };
+  for (unsigned i = 0; i < 4; i++)
+    FillRect(dc, &sides[i], g_Back);
+  HBRUSH border = CreateSolidBrush(RGB(76, 80, 88));
+  if (border)
+  {
+    RECT frame = { 0, 0, width, height };
+    FrameRect(dc, &frame, border);
+    DeleteObject(border);
+  }
+  if (!printDC) ReleaseDC(wnd, dc);
+}
+
 static LRESULT CALLBACK ChildProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp,
     UINT_PTR id, DWORD_PTR data)
 {
@@ -288,6 +320,13 @@ static LRESULT CALLBACK ChildProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp,
   }
   if (g_Dark)
   {
+    if (data == 3 && (msg == WM_NCPAINT
+        || (msg == WM_PRINT && (lp & PRF_NONCLIENT))))
+    {
+      const LRESULT result = DefSubclassProc(wnd, msg, wp, lp);
+      PaintListBorder(wnd, msg == WM_PRINT ? (HDC)wp : NULL);
+      return result;
+    }
     if (msg == WM_CTLCOLOREDIT || msg == WM_CTLCOLORLISTBOX || msg == WM_CTLCOLORSTATIC)
     {
       HDC dc = (HDC)wp;
@@ -404,7 +443,7 @@ static BOOL CALLBACK ApplyChild(HWND wnd, LPARAM)
   DWORD_PTR kind = 0;
   if (lstrcmpiW(name, WC_LISTVIEWW) == 0)
   {
-    kind = 1;
+    kind = 3;
     SetTheme(wnd, g_Dark ? L"DarkMode_Explorer" : L"Explorer");
     ListView_SetBkColor(wnd, Back());
     ListView_SetTextBkColor(wnd, Back());
