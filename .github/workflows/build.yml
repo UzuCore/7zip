@@ -232,7 +232,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not generate MSI payload." }
           & $wix build -arch $env:BUILD_ARCH `
             -d "BuildArch=$env:BUILD_ARCH" `
-            -d "ProductName=7-Zip UzuCore ($env:BUILD_ARCH)" `
+            -d "ProductName=7zip+α ($env:BUILD_ARCH)" `
             -d "PackageVersion=$packageVersion" `
             -d "PayloadDir=$artifactDir" `
             -d "LicenseRtf=$licenseRtf" `
@@ -265,12 +265,12 @@ jobs:
           $setupConfig = Join-Path $env:RUNNER_TEMP "7zip-installer-$env:BUILD_ARCH-config.txt"
           $setupConfigText = @"
           ;!@Install@!UTF-8!
-          Title="7-Zip UzuCore Setup"
+          Title="7zip+α Setup"
           ExecuteFile="msiexec.exe"
           ExecuteParameters="/i $msiName"
           ;!@InstallEnd@!
           "@
-          [IO.File]::WriteAllText($setupConfig, $setupConfigText, [Text.Encoding]::ASCII)
+          [IO.File]::WriteAllText($setupConfig, $setupConfigText, [Text.UTF8Encoding]::new($false))
           $setupExe = Join-Path $artifactDir "7zip-windows-$env:BUILD_ARCH.exe"
           $setupStream = [IO.File]::Create($setupExe)
           try {

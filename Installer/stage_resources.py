@@ -40,6 +40,17 @@ with tempfile.TemporaryDirectory() as work:
                 shutil.copytree(item, a.destination / item.name, dirs_exist_ok=True)
             else:
                 shutil.copyfile(item, a.destination / item.name)
+        for language in (a.destination / "Lang").glob("*.txt"):
+            lines = language.read_text(encoding="utf-8-sig").splitlines(keepends=True)
+            preserved_identifier = False
+            for index, line in enumerate(lines):
+                # Lang2 entry 0 identifies the upstream file format, not the UI brand.
+                if not preserved_identifier and line.strip() == "7-Zip":
+                    preserved_identifier = True
+                elif not line.lstrip().startswith(";"):
+                    lines[index] = line.replace("7-Zip", "7zip+α")
+            assert preserved_identifier, "Missing Lang2 product identifier"
+            language.write_text("".join(lines), encoding="utf-8-sig")
         assert (a.destination / "Lang/ko.txt").is_file()
         assert (a.destination / "7-zip.chm").is_file()
     else:

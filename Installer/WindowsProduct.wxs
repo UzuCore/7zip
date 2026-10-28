@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="$(var.ProductName)" Manufacturer="UzuCore" Version="$(var.PackageVersion)"
-           UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of 7-Zip UzuCore is already installed." />
+           UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine" Codepage="1253">
+    <SummaryInformation Codepage="1253" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of 7zip+α is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
     <Property Id="ARPCONTACT" Value="UzuCore" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/UzuCore/7zip" />
@@ -21,7 +22,7 @@
         <Component Id="ShellIntegration" Guid="*">
           <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{23170F69-40C1-278A-1000-000100020001}\InprocServer32" Type="string" Value="[INSTALLFOLDER]7-zip.dll" KeyPath="yes" />
           <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{23170F69-40C1-278A-1000-000100020001}\InprocServer32" Name="ThreadingModel" Type="string" Value="Apartment" />
-          <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved" Name="{23170F69-40C1-278A-1000-000100020001}" Type="string" Value="7-Zip UzuCore Shell Extension" />
+          <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved" Name="{23170F69-40C1-278A-1000-000100020001}" Type="string" Value="7zip+α Shell Extension" />
           <RegistryValue Root="HKLM" Key="Software\7-Zip UzuCore" Name="Path" Type="string" Value="[INSTALLFOLDER]" />
           <RegistryValue Root="HKLM" Key="Software\7-Zip UzuCore" Name="Path64" Type="string" Value="[INSTALLFOLDER]" />
           <RegistryValue Root="HKLM" Key="Software\Classes\*\shellex\ContextMenuHandlers\7-Zip UzuCore" Type="string" Value="{23170F69-40C1-278A-1000-000100020001}" />
@@ -40,9 +41,9 @@
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="ApplicationStartMenuFolder" Name="7-Zip UzuCore">
+      <Directory Id="ApplicationStartMenuFolder" Name="7zip+α">
         <Component Id="StartMenuShortcut" Guid="*">
-          <Shortcut Id="FileManagerShortcut" Name="7-Zip UzuCore File Manager" Target="[#SevenZipFileManager]" WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut Id="FileManagerShortcut" Name="7zip+α File Manager" Target="[#SevenZipFileManager]" WorkingDirectory="INSTALLFOLDER" />
           <RemoveFolder Id="RemoveStartMenuFolder" Directory="ApplicationStartMenuFolder" On="uninstall" />
           <RegistryValue Root="HKLM" Key="Software\UzuCore\7-Zip" Name="installed" Type="integer" Value="1" KeyPath="yes" />
         </Component>

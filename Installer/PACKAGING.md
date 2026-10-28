@@ -1,4 +1,7 @@
-# Distribution baseline
+# 7zip+α distribution baseline
+
+The displayed application name is **7zip+α**. Legacy install paths, registry keys
+and UpgradeCode remain stable so previous UzuCore packages can be upgraded.
 
 The baseline is the official 7-Zip 26.05 release (https://www.7-zip.org/download.html).
 `upstream-assets.json` pins resource archive URLs and SHA-256 hashes. Update it when

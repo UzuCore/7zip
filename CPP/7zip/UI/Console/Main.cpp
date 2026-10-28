@@ -123,7 +123,7 @@ DECLARE_AND_SET_CLIENT_VERSION_VAR
 #endif
 
 
-static const char * const kCopyrightString = "\n7-Zip"
+static const wchar_t * const kCopyrightString = L"\n7zip+\u03B1"
   PROG_POSTFIX_2
   " " MY_VERSION_CPU
   " : " MY_COPYRIGHT_DATE "\n";
