@@ -262,7 +262,7 @@ bool CMenuPage::OnInit()
             s2 += (".zip");
             break;
         }
-        s = MyFormatNew(s, s2);
+        s = MyFormatNew(LangString_CompressTo(menuItem.Flag == kCompressToZip), s2);
         break;
       }
     }

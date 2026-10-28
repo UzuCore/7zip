@@ -323,7 +323,10 @@ void CZipContextMenu::FillCommand(enum_CommandInternalID id, UString &mainString
   cmi.Verb = kMainVerb;
   cmi.Verb += command.Verb;
   // cmi.HelpString = cmi.Verb;
-  LangString(command.ResourceID, mainString);
+  if (id == kCompressTo7z || id == kCompressToZip)
+    mainString = LangString_CompressTo(id == kCompressToZip);
+  else
+    LangString(command.ResourceID, mainString);
   cmi.UserString = mainString;
 }
 
