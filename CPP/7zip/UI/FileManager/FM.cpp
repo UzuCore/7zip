@@ -240,6 +240,10 @@ typedef HRESULT (WINAPI *Func_DwmSetWindowAttribute)(
 );
 */
 
+#ifndef UNDER_CE
+#include "ThemePreview.h"
+#endif
+
 static BOOL InitInstance(int nCmdShow)
 {
   CWindow wnd;
@@ -392,6 +396,10 @@ static BOOL InitInstance(int nCmdShow)
     }
   }
   */
+
+  #ifndef UNDER_CE
+  NThemePreview::Attach(wnd);
+  #endif
 
   if (nCmdShow == SW_SHOWNORMAL ||
       nCmdShow == SW_SHOW
