@@ -74,3 +74,25 @@ folders, and ZIP/7z/ALZ/EGG extraction. These checks did not install the extensi
 or automate a physical Explorer right-click. The installed Bandizip Korean and
 English language files supplied menu semantics; native decompilation was unavailable
 because no analysis engine was configured.
+
+### Explorer availability during MSI installation
+
+The MSI sets `MSIRESTARTMANAGERCONTROL=DisableShutdown`. Windows Installer still
+checks files in use but uses the classic FilesInUse handling instead of asking
+Restart Manager to automatically shut down Explorer or other shell-extension
+hosts. If a DLL cannot be replaced while its host is running, close the affected
+application manually or complete any restart requested by Windows Installer.
+The installer must not kill or restart Explorer through custom actions.
+
+This addresses the 2026-10-29 installation incident with package 26.5.33:
+Restart Manager event 10010 reported that Explorer could not be restarted due
+to an application/conductor SID mismatch; event 10006 then reported that
+Explorer could not be shut down. Installation completed successfully, followed
+by Explorer hangs and loss of the taskbar. The cached installed MSI had no
+Restart Manager control property, so Windows Installer's automatic behavior
+was active. The precise internal Explorer wait causing the residual hang was
+not established by a dump analysis.
+
+Windows CI reads the compiled MSI with `verify_windows_installer.ps1` before
+embedding that same MSI into the setup EXE, covering both x64 and ARM64 packages.
+Reference: [Microsoft MSIRESTARTMANAGERCONTROL documentation](https://learn.microsoft.com/en-us/windows/win32/msi/msirestartmanagercontrol).

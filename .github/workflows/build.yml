@@ -243,6 +243,8 @@ jobs:
             throw "WiX failed to build the $env:BUILD_ARCH installer MSI."
           }
 
+          & (Join-Path $env:GITHUB_WORKSPACE 'Installer\verify_windows_installer.ps1') -MsiPath $msiPath
+
           $setupSfx = Join-Path $env:GITHUB_WORKSPACE "CPP\7zip\Bundles\SFXSetup\$env:BUILD_ARCH\7zS.sfx"
           if (-not (Test-Path -LiteralPath $setupSfx)) {
             throw "The $env:BUILD_ARCH setup SFX module was not built: $setupSfx"

@@ -4,6 +4,9 @@
            UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine" Codepage="1253">
     <SummaryInformation Codepage="1253" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of 7zip+α is already installed." />
+    <!-- Keep Explorer and other shell-extension hosts running during upgrades.
+         Locked DLLs use FilesInUse handling instead of Restart Manager shutdown. -->
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="DisableShutdown" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
     <Property Id="ARPCONTACT" Value="UzuCore" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/UzuCore/7zip" />
