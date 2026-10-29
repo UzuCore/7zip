@@ -188,8 +188,10 @@ jobs:
           if ($env:BUILD_ARCH -eq "x64") {
             Copy-Item "CPP\7zip\UI\Explorer\x86\7-zip.dll" (Join-Path $artifactDir "7-zip32.dll")
           }
-          python Installer/stage_resources.py windows $env:BUILD_ARCH $artifactDir --extractor (Join-Path $artifactDir "7zz.exe")
+          Write-Host 'Staging upstream Windows resources.'
+          python -u Installer/stage_resources.py windows $env:BUILD_ARCH $artifactDir --extractor (Join-Path $artifactDir "7zz.exe")
           if ($LASTEXITCODE -ne 0) { throw "Could not stage Windows resources." }
+          Write-Host 'Upstream Windows resources staged.'
           Copy-Item 'DOC\License.txt' $artifactDir
           Copy-Item 'DOC\copying.txt' $artifactDir
           Copy-Item 'DOC\unRarLicense.txt' $artifactDir
@@ -400,6 +402,8 @@ jobs:
               $path = "Cert:\CurrentUser\$store\$thumbprint"
               if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
             }
+            $machineRoot = "Cert:\LocalMachine\Root\$thumbprint"
+            if (Test-Path -LiteralPath $machineRoot) { Remove-Item -LiteralPath $machineRoot -Force }
           }
 
   macos:
