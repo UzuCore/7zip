@@ -167,7 +167,8 @@ CZipContextMenu::CZipContextMenu():
    _writeZone((UInt32)(Int32)-1),
    IsSeparator(false),
    IsRoot(true),
-   CurrentSubCommand(0)
+   CurrentSubCommand(0),
+   _subCommandsReady(false)
 {
   ODS("== CZipContextMenu()");
   InterlockedIncrement(&g_DllRefCount);
@@ -1497,7 +1498,8 @@ private:
   */
 };
 
-static HRESULT LoadPaths(IShellItemArray *psiItemArray, UStringVector &paths)
+static HRESULT LoadPaths(IShellItemArray *psiItemArray, UStringVector &paths,
+    NShell::CFileAttribs *attribs = NULL)
 {
   if (psiItemArray)
   {
@@ -1516,6 +1518,13 @@ static HRESULT LoadPaths(IShellItemArray *psiItemArray, UStringVector &paths)
               && (bool)displayName)
           {
             ODS_U(displayName)
+            if (attribs && attribs->FirstDirIndex < 0)
+            {
+              SFGAOF attributes = 0;
+              if (item->GetAttributes(SFGAO_FOLDER | SFGAO_STREAM, &attributes) == S_OK
+                  && (attributes & SFGAO_FOLDER) && !(attributes & SFGAO_STREAM))
+                attribs->FirstDirIndex = (int)paths.Size();
+            }
             paths.Add((LPCWSTR)displayName);
           }
         }
@@ -1527,14 +1536,17 @@ static HRESULT LoadPaths(IShellItemArray *psiItemArray, UStringVector &paths)
 }
 
 
-void CZipExplorerCommand::LoadItems(IShellItemArray *psiItemArray)
+HRESULT CZipExplorerCommand::LoadItems(IShellItemArray *psiItemArray)
 {
   SubCommands.Clear();
+  CurrentSubCommand = 0;
   _fileNames.Clear();
+  _attribs.Clear();
+  _isMenuForFM = false;
+  _dropMode = false;
   {
     UStringVector paths;
-    if (LoadPaths(psiItemArray, paths) != S_OK)
-      return;
+    RINOK(LoadPaths(psiItemArray, paths, &_attribs))
     _fileNames = paths;
   }
   const HRESULT res = QueryContextMenu(
@@ -1545,7 +1557,7 @@ void CZipExplorerCommand::LoadItems(IShellItemArray *psiItemArray)
       CMF_NORMAL);
 
   if (FAILED(res))
-    return /* res */;
+    return res;
 
   CZipExplorerCommand *crcHandler = NULL;
   CZipExplorerCommand *openHandler = NULL;
@@ -1565,6 +1577,8 @@ void CZipExplorerCommand::LoadItems(IShellItemArray *psiItemArray)
       
     CZipContextMenu *shellExt = new CZipContextMenu();
     shellExt->IsRoot = false;
+    shellExt->_writeZone = _writeZone;
+    shellExt->_elimDup = _elimDup;
 
     if (cmi.CtxCommandType == CtxCommandType_CrcRoot && !useCascadedCrc)
       shellExt->IsSeparator = true;
@@ -1590,13 +1604,15 @@ void CZipExplorerCommand::LoadItems(IShellItemArray *psiItemArray)
       openHandler = shellExt;
     }
   }
+  _subCommandsReady = true;
+  return S_OK;
 }
 
 
 Z7_COMWF_B CZipExplorerCommand::GetTitle(IShellItemArray *psiItemArray, LPWSTR *ppszName)
 {
   ODS("- GetTitle()")
- // COM_TRY_BEGIN
+  COM_TRY_BEGIN
   if (IsSeparator)
   {
     *ppszName = NULL;
@@ -1606,7 +1622,7 @@ Z7_COMWF_B CZipExplorerCommand::GetTitle(IShellItemArray *psiItemArray, LPWSTR *
   UString name;
   if (IsRoot)
   {
-    LoadItems(psiItemArray);
+    CacheSelection(psiItemArray);
     name = L"7zip+\u03B1"; //  "New"
   }
   else
@@ -1622,22 +1638,22 @@ Z7_COMWF_B CZipExplorerCommand::GetTitle(IShellItemArray *psiItemArray, LPWSTR *
 
   return My_SHStrDupW(name, ppszName);
   // return S_OK;
-  // COM_TRY_END
+  COM_TRY_END
 }
 
 
 Z7_COMWF_B CZipExplorerCommand::GetIcon(IShellItemArray * /* psiItemArray */, LPWSTR *ppszIcon)
 {
   ODS("- GetIcon()")
-  // COM_TRY_BEGIN
+  COM_TRY_BEGIN
   *ppszIcon = NULL;
   // return E_NOTIMPL;
   UString imageName = fs2us(NWindows::NDLL::GetModuleDirPrefix());
   // imageName += "7zG.exe";
-  imageName += "7-zip.dll";
+  imageName += "7zFM.exe,0";
   // imageName += ",190";
   return My_SHStrDupW(imageName, ppszIcon);
-  // COM_TRY_END
+  COM_TRY_END
 }
 
 
@@ -1655,19 +1671,40 @@ Z7_COMWF_B CZipExplorerCommand::GetCanonicalName(GUID *pguidCommandName)
 {
   // COM_TRY_BEGIN
   ODS("- GetCanonicalName()")
-  *pguidCommandName = GUID_NULL;
-  return E_NOTIMPL;
+  const GUID root = { 0x23170F69, 0x40C1, 0x278A,
+      { 0x10, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02 } };
+  *pguidCommandName = root;
+  if (!_commandMap_Cur.IsEmpty())
+    pguidCommandName->Data4[7] = (BYTE)(0x40 + _commandMap_Cur[0].CommandInternalID);
+  return S_OK;
   // COM_TRY_END
 }
 
 
-Z7_COMWF_B CZipExplorerCommand::GetState(IShellItemArray * /* psiItemArray */, BOOL /* fOkToBeSlow */, EXPCMDSTATE *pCmdState)
+Z7_COMWF_B CZipExplorerCommand::GetState(IShellItemArray *psiItemArray, BOOL fOkToBeSlow, EXPCMDSTATE *pCmdState)
 {
-  // COM_TRY_BEGIN
-  ODS("- GetState()")
+  COM_TRY_BEGIN
   *pCmdState = ECS_ENABLED;
+  if (IsRoot)
+  {
+    CacheSelection(psiItemArray);
+    if (!_menuSelection)
+    {
+      *pCmdState = ECS_HIDDEN;
+      return S_OK;
+    }
+    if (!_subCommandsReady)
+    {
+      // Explorer may call this on its UI thread. Defer filesystem/menu work.
+      if (!fOkToBeSlow)
+        return E_PENDING;
+      RINOK(LoadItems(_menuSelection))
+    }
+    if (SubCommands.IsEmpty())
+      *pCmdState = ECS_HIDDEN;
+  }
   return S_OK;
-  // COM_TRY_END
+  COM_TRY_END
 }
 
 
@@ -1683,7 +1720,8 @@ Z7_COMWF_B CZipExplorerCommand::Invoke(IShellItemArray *psiItemArray, IBindCtx *
   ODS("- Invoke()")
   _fileNames.Clear();
   UStringVector paths;
-  RINOK(LoadPaths(psiItemArray, paths))
+  _attribs.Clear();
+  RINOK(LoadPaths(psiItemArray, paths, &_attribs))
   _fileNames = paths;
   return InvokeCommandCommon(_commandMap_Cur[0]);
 
@@ -1721,8 +1759,15 @@ Z7_COMWF_B CZipExplorerCommand::GetFlags(EXPCMDFLAGS *pFlags)
 Z7_COMWF_B CZipExplorerCommand::EnumSubCommands(IEnumExplorerCommand **ppEnum)
 {
   ODS("- EnumSubCommands()")
-  // COM_TRY_BEGIN
+  COM_TRY_BEGIN
   *ppEnum = NULL;
+  if (IsRoot && !_subCommandsReady)
+  {
+    if (!_menuSelection)
+      return E_NOTIMPL;
+    RINOK(LoadItems(_menuSelection))
+  }
+  CurrentSubCommand = 0;
 
   if (!_commandMap_Cur.IsEmpty() && _commandMap_Cur[0].IsSubMenu())
   {
@@ -1739,9 +1784,7 @@ Z7_COMWF_B CZipExplorerCommand::EnumSubCommands(IEnumExplorerCommand **ppEnum)
  
   // shellExt->
   return QueryInterface(IID_IEnumExplorerCommand, (void **)ppEnum);
-
-  // return S_OK;
-  // COM_TRY_END
+  COM_TRY_END
 }
 
 
@@ -1779,10 +1822,12 @@ Z7_COMWF_B CZipContextMenu::Next(ULONG celt, IExplorerCommand **pUICommand, ULON
 }
 
 
-Z7_COMWF_B CZipContextMenu::Skip(ULONG /* celt */)
+Z7_COMWF_B CZipContextMenu::Skip(ULONG celt)
 {
-  ODS("CZipContextMenu::Skip()")
-  return E_NOTIMPL;
+  const unsigned remaining = SubCommands.Size() - CurrentSubCommand;
+  const ULONG skipped = celt < remaining ? celt : remaining;
+  CurrentSubCommand += skipped;
+  return skipped == celt ? S_OK : S_FALSE;
 }
 
 
@@ -1797,6 +1842,12 @@ Z7_COMWF_B CZipContextMenu::Reset(void)
 Z7_COMWF_B CZipContextMenu::Clone(IEnumExplorerCommand **ppenum)
 {
   ODS("CZipContextMenu::Clone()")
+  COM_TRY_BEGIN
   *ppenum = NULL;
-  return E_NOTIMPL;
+  CZipContextMenu *copy = new CZipContextMenu();
+  CMyComPtr<IExplorerCommand> owner = copy;
+  copy->SubCommands = SubCommands;
+  copy->CurrentSubCommand = CurrentSubCommand;
+  return copy->QueryInterface(IID_IEnumExplorerCommand, (void **)ppenum);
+  COM_TRY_END
 }

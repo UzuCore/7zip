@@ -1,12 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="$(var.ProductName)" Manufacturer="UzuCore" Version="$(var.PackageVersion)"
-           UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine" Codepage="1253">
-    <SummaryInformation Codepage="1253" />
+           UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine" Codepage="949">
+    <SummaryInformation Codepage="949" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of 7zip+α is already installed." />
     <!-- Keep Explorer and other shell-extension hosts running during upgrades.
          Locked DLLs use FilesInUse handling instead of Restart Manager shutdown. -->
     <Property Id="MSIRESTARTMANAGERCONTROL" Value="DisableShutdown" />
+    <?ifndef ModernShellEnabled ?>
+      <?define ModernShellEnabled = 0 ?>
+    <?endif?>
+    <?ifndef ModernSelfSigned ?>
+      <?define ModernSelfSigned = 0 ?>
+    <?endif?>
+    <?if $(var.ModernSelfSigned) = 1 ?>
+    <Property Id="SELF_SIGNED_MENU_CONSENT" Secure="yes" />
+    <UI>
+      <TextStyle Id="SelfSigningFont" FaceName="Segoe UI" Size="9" />
+      <TextStyle Id="SelfSigningTitleFont" FaceName="Segoe UI" Size="12" Bold="yes" />
+      <Dialog Id="SelfSigningConsentDlg" Width="390" Height="300" Title="[ProductName] 설치 옵션" NoMinimize="yes">
+        <Control Id="Heading" Type="Text" X="18" Y="14" Width="354" Height="24" Text="{\SelfSigningTitleFont}관리자 권한 및 인증서 안내" />
+        <Control Id="AdministratorNotice" Type="Text" X="18" Y="46" Width="354" Height="35" Text="{\SelfSigningFont}설치하려면 관리자 권한이 필요합니다. Windows 권한 요청 창에서 '예'를 선택해 주세요." />
+        <Control Id="TrustNotice" Type="Text" X="18" Y="88" Width="354" Height="73" Text="{\SelfSigningFont}Windows 11 첫 우클릭 메뉴를 사용하려면 자체 서명 인증서를 이 컴퓨터의 '신뢰할 수 있는 사람' 저장소에 등록해야 합니다. 이 인증서로 서명한 다른 코드도 신뢰 대상이 됩니다. 등록하지 않아도 프로그램과 기존 우클릭 메뉴는 사용할 수 있습니다." />
+        <Control Id="Fingerprint" Type="Text" X="18" Y="168" Width="354" Height="33" Text="{\SelfSigningFont}인증서: 7zipAlpha UzuCore&#10;지문: $(var.SelfSigningThumbprint)" />
+        <Control Id="Consent" Type="CheckBox" X="18" Y="210" Width="354" Height="30" Property="SELF_SIGNED_MENU_CONSENT" CheckBoxValue="1" Text="{\SelfSigningFont}인증서 신뢰 등록에 동의하고 Windows 11 우클릭 메뉴를 사용합니다." />
+        <Control Id="Line" Type="Line" X="0" Y="256" Width="390" Height="0" />
+        <Control Id="Install" Type="PushButton" X="220" Y="270" Width="75" Height="18" Default="yes" Text="설치">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="302" Y="270" Width="70" Height="18" Cancel="yes" Text="취소">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+    </UI>
+    <InstallUISequence>
+      <Show Dialog="SelfSigningConsentDlg" Before="ExecuteAction" Condition="NOT Installed" />
+    </InstallUISequence>
+    <?define ModernConsentArgument = " -SelfSignedConsent" ?>
+    <?else?>
+    <?define ModernConsentArgument = "" ?>
+    <?endif?>
+    <?if $(var.ModernShellEnabled) = 1 ?>
+    <!-- Execute only for packages whose trusted MSIX signature passed CI validation.
+         Never force-close Explorer: package updates defer running hosts to the OS. -->
+    <CustomAction Id="SetRegisterModernShell" Property="RegisterModernShell"
+      Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File &quot;[INSTALLFOLDER]ShellIntegration\Register-ModernShell.ps1&quot; -InstallDirectory &quot;[INSTALLFOLDER].&quot; -AllUsers$(var.ModernConsentArgument) -LogPath &quot;[CommonAppDataFolder]UzuCore\7zipAlpha\InstallerLogs\register-shell.log&quot;" />
+    <CustomAction Id="RegisterModernShell" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="check" ExeCommand="[RegisterModernShell]" />
+    <CustomAction Id="SetUnregisterModernShell" Property="UnregisterModernShell"
+      Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File &quot;[INSTALLFOLDER]ShellIntegration\Register-ModernShell.ps1&quot; -AllUsers -Unregister -LogPath &quot;[CommonAppDataFolder]UzuCore\7zipAlpha\InstallerLogs\unregister-shell.log&quot;" />
+    <CustomAction Id="UnregisterModernShell" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="check" ExeCommand="[UnregisterModernShell]" />
+    <CustomAction Id="SetRollbackModernShell" Property="RollbackModernShell"
+      Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File &quot;[INSTALLFOLDER]ShellIntegration\Register-ModernShell.ps1&quot; -AllUsers -Unregister -LogPath &quot;[CommonAppDataFolder]UzuCore\7zipAlpha\InstallerLogs\unregister-shell.log&quot;" />
+    <CustomAction Id="RollbackModernShell" Directory="INSTALLFOLDER" Execute="rollback" Impersonate="no" Return="ignore" ExeCommand="[RollbackModernShell]" />
+    <InstallExecuteSequence>
+      <Custom Action="SetUnregisterModernShell" Before="UnregisterModernShell" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="UnregisterModernShell" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <?if $(var.ModernSelfSigned) = 1 ?>
+      <Custom Action="SetRollbackModernShell" Before="RollbackModernShell" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE~=&quot;ALL&quot; AND SELF_SIGNED_MENU_CONSENT=&quot;1&quot;" />
+      <Custom Action="RollbackModernShell" Before="RegisterModernShell" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE~=&quot;ALL&quot; AND SELF_SIGNED_MENU_CONSENT=&quot;1&quot;" />
+      <Custom Action="SetRegisterModernShell" Before="RegisterModernShell" Condition="NOT REMOVE~=&quot;ALL&quot; AND SELF_SIGNED_MENU_CONSENT=&quot;1&quot;" />
+      <Custom Action="RegisterModernShell" After="InstallFiles" Condition="NOT REMOVE~=&quot;ALL&quot; AND SELF_SIGNED_MENU_CONSENT=&quot;1&quot;" />
+      <?else?>
+      <Custom Action="SetRollbackModernShell" Before="RollbackModernShell" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="RollbackModernShell" Before="RegisterModernShell" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="SetRegisterModernShell" Before="RegisterModernShell" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="RegisterModernShell" After="InstallFiles" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <?endif?>
+    </InstallExecuteSequence>
+    <?endif?>
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
     <Property Id="ARPCONTACT" Value="UzuCore" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/UzuCore/7zip" />

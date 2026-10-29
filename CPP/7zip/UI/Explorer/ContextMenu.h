@@ -106,7 +106,7 @@ public:
     // _fileNames_WereReduced = false;
   }
 
-  void LoadItems(IShellItemArray *psiItemArray);
+  HRESULT LoadItems(IShellItemArray *psiItemArray);
 
   CZipContextMenu();
   ~CZipContextMenu();
@@ -155,6 +155,19 @@ private:
   bool IsRoot;
   CObjectVector< CMyComPtr<IExplorerCommand> > SubCommands;
   unsigned CurrentSubCommand;
+  CMyComPtr<IShellItemArray> _menuSelection;
+  bool _subCommandsReady;
+
+  void CacheSelection(IShellItemArray *items)
+  {
+    if (items && (IShellItemArray *)_menuSelection != items)
+    {
+      _menuSelection = items;
+      SubCommands.Clear();
+      CurrentSubCommand = 0;
+      _subCommandsReady = false;
+    }
+  }
 
   void Set_UserString_in_LastCommand(const UString &s)
   {

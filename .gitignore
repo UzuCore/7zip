@@ -1,2 +1,7 @@
 # GNU make output directories
 _o/
+
+# Release signing keys belong in certificate stores / Actions secrets.
+*.pfx
+*.p12
+*.key

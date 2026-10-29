@@ -52,6 +52,13 @@ Z7_DEFINE_GUID(CLSID_CZipContextMenu,
     k_7zip_GUID_Data3_Common,
     0x10, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01);
 
+// Separate activation identity for the Windows 11 packaged COM registration.
+Z7_DEFINE_GUID(CLSID_CZipExplorerCommand,
+    k_7zip_GUID_Data1,
+    k_7zip_GUID_Data2,
+    k_7zip_GUID_Data3_Common,
+    0x10, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02);
+
 using namespace NWindows;
 
 extern
@@ -177,7 +184,8 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppv)
 {
   ODS("In DllGetClassObject\r\n");
   *ppv = NULL;
-  if (IsEqualIID(rclsid, CLSID_CZipContextMenu))
+  if (IsEqualIID(rclsid, CLSID_CZipContextMenu)
+      || IsEqualIID(rclsid, CLSID_CZipExplorerCommand))
   {
     CShellExtClassFactory *cf;
     try

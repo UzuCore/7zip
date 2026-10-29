@@ -58,6 +58,9 @@ jobs:
 
   windows:
     name: Windows ${{ matrix.arch }}
+    permissions:
+      contents: read
+      actions: read
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -78,6 +81,10 @@ jobs:
         env:
           BUILD_ARCH: ${{ matrix.arch }}
           VS_COMPONENT: ${{ matrix.vs_component }}
+          SHELL_PUBLISHER: ${{ vars.SIGNPATH_SHELL_PUBLISHER }}
+          SELF_SIGN_BUILD: ${{ vars.WINDOWS_SIGNING_MODE == 'self-signed' && github.event_name != 'pull_request' }}
+          WINDOWS_SELF_SIGN_PFX: ${{ secrets.WINDOWS_SELF_SIGN_PFX }}
+          WINDOWS_SELF_SIGN_PASSWORD: ${{ secrets.WINDOWS_SELF_SIGN_PASSWORD }}
         run: |
           $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
           $vswhere = Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -187,19 +194,91 @@ jobs:
           Copy-Item 'DOC\copying.txt' $artifactDir
           Copy-Item 'DOC\unRarLicense.txt' $artifactDir
           Copy-Item 'CPP\7zip\Archive\AlzEgg\third_party\unegg\LICENSE.txt' (Join-Path $artifactDir 'UnEGG-LICENSE.txt')
+          if ($env:SELF_SIGN_BUILD -eq 'true') {
+            $runtimeFiles = Get-ChildItem -LiteralPath $artifactDir -File | Where-Object Extension -in @('.exe', '.dll') | ForEach-Object FullName
+            & (Join-Path $env:GITHUB_WORKSPACE 'Installer\Sign-WindowsFiles.ps1') -Files $runtimeFiles -TrustForBuild
+          }
+          $versionHeader = Get-Content (Join-Path $env:GITHUB_WORKSPACE 'C\7zVersion.h') -Raw
+          $versionMajor = [regex]::Match($versionHeader, '(?m)^#define MY_VER_MAJOR (\d+)').Groups[1].Value
+          $versionMinor = [regex]::Match($versionHeader, '(?m)^#define MY_VER_MINOR (\d+)').Groups[1].Value
+          if (-not $versionMajor -or -not $versionMinor) {
+            throw 'Could not read the product version from C/7zVersion.h.'
+          }
+          $packageVersion = "$versionMajor.$versionMinor.$env:GITHUB_RUN_NUMBER"
+          $shellDir = Join-Path $artifactDir 'ShellIntegration'
+          $publisher = if ($env:SHELL_PUBLISHER) { $env:SHELL_PUBLISHER } else { 'CN=UzuCore' }
+          $identityArgs = @('--arch', $env:BUILD_ARCH, '--version', "$packageVersion.0", '--publisher', $publisher, '--output', $shellDir)
+          if ($env:SELF_SIGN_BUILD -eq 'true') { $identityArgs += '--self-signed' }
+          python Installer/build_modern_shell.py @identityArgs
+          if ($LASTEXITCODE -ne 0) { throw 'Could not generate Windows 11 shell identity.' }
+          $sdkBin = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $sdkBin) { throw 'Windows SDK MakeAppx was not found.' }
+          $shellMsix = Join-Path $env:RUNNER_TEMP '7zip-alpha-shell.msix'
+          & $sdkBin.FullName pack /o /nv /d $shellDir /p $shellMsix
+          if ($LASTEXITCODE -ne 0) { throw 'Could not build Windows 11 shell identity MSIX.' }
+          Move-Item -LiteralPath $shellMsix -Destination $shellDir
+          if ($env:SELF_SIGN_BUILD -eq 'true') {
+            & (Join-Path $env:GITHUB_WORKSPACE 'Installer\Sign-WindowsFiles.ps1') -Files (Join-Path $shellDir '7zip-alpha-shell.msix') -TrustForBuild
+          }
+          python Installer/verify_modern_shell.py --arch $env:BUILD_ARCH --directory $shellDir --dll (Join-Path $artifactDir '7-zip.dll')
+          if ($LASTEXITCODE -ne 0) { throw 'Windows 11 shell package validation failed.' }
+
+      - name: Upload shell package for signing
+        id: shell-signing-input
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-shell-${{ matrix.arch }}
+          path: dist/windows-${{ matrix.arch }}/ShellIntegration/7zip-alpha-shell.msix
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Sign Windows 11 shell identity
+        if: vars.WINDOWS_SIGNING_MODE != 'self-signed' && vars.SIGNPATH_SHELL_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_SHELL_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.shell-signing-input.outputs.artifact-id }}
+          output-artifact-directory: dist/windows-${{ matrix.arch }}/ShellIntegration
+
+      - name: Package Windows installers and portable archive
+        shell: pwsh
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+          SHELL_SIGNING_REQUIRED: ${{ vars.SIGNPATH_SHELL_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+          SELF_SIGN_BUILD: ${{ vars.WINDOWS_SIGNING_MODE == 'self-signed' && github.event_name != 'pull_request' }}
+        run: |
+          $artifactDir = Join-Path $env:GITHUB_WORKSPACE "dist\windows-$env:BUILD_ARCH"
+          $shellMsix = Join-Path $artifactDir 'ShellIntegration\7zip-alpha-shell.msix'
+          $modernShellEnabled = 0
+          $modernSelfSigned = 0
+          $selfSigningThumbprint = ''
+          if ($env:SELF_SIGN_BUILD -eq 'true') {
+            $selfSigning = Get-Content (Join-Path $artifactDir 'ShellIntegration\self-signing.json') -Raw | ConvertFrom-Json
+            $signature = Get-AuthenticodeSignature -LiteralPath $shellMsix
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $selfSigning.thumbprint) { throw 'Self-signed shell package validation failed.' }
+            $modernShellEnabled = 1
+            $modernSelfSigned = 1
+            $selfSigningThumbprint = $selfSigning.thumbprint
+            'Windows self-signing enabled. Modern menu registration requires explicit certificate-trust consent in the installer. Initial SmartScreen warnings are still possible.' | Add-Content $env:GITHUB_STEP_SUMMARY
+          } elseif ($env:SHELL_SIGNING_REQUIRED -eq 'true') {
+            if ((Get-AuthenticodeSignature -LiteralPath $shellMsix).Status -ne 'Valid') {
+              throw 'The production shell identity must have a trusted signature.'
+            }
+            $modernShellEnabled = 1
+          } else {
+            'Windows 11 modern menu: development package only; trusted signing is not configured. Classic menu remains available.' | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
           $portableArchive = Join-Path $env:RUNNER_TEMP "7zip-windows-$env:BUILD_ARCH.7z"
           Push-Location $artifactDir
           try {
             & (Join-Path $artifactDir '7zz.exe') a -t7z $portableArchive '*'
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to package Windows $env:BUILD_ARCH portable archive."
-            }
-          }
-          finally {
-            Pop-Location
-          }
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to package Windows portable archive.' }
+          } finally { Pop-Location }
           Move-Item -LiteralPath $portableArchive -Destination (Join-Path $artifactDir "7zip-windows-$env:BUILD_ARCH.7z")
-
           $versionHeader = Get-Content (Join-Path $env:GITHUB_WORKSPACE 'C\7zVersion.h') -Raw
           $versionMajor = [regex]::Match($versionHeader, '(?m)^#define MY_VER_MAJOR (\d+)').Groups[1].Value
           $versionMinor = [regex]::Match($versionHeader, '(?m)^#define MY_VER_MINOR (\d+)').Groups[1].Value
@@ -232,6 +311,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not generate MSI payload." }
           & $wix build -arch $env:BUILD_ARCH `
             -d "BuildArch=$env:BUILD_ARCH" `
+            -d "ModernShellEnabled=$modernShellEnabled" `
+            -d "ModernSelfSigned=$modernSelfSigned" `
+            -d "SelfSigningThumbprint=$selfSigningThumbprint" `
             -d "ProductName=7zip+α ($env:BUILD_ARCH)" `
             -d "PackageVersion=$packageVersion" `
             -d "PayloadDir=$artifactDir" `
@@ -243,7 +325,10 @@ jobs:
             throw "WiX failed to build the $env:BUILD_ARCH installer MSI."
           }
 
-          & (Join-Path $env:GITHUB_WORKSPACE 'Installer\verify_windows_installer.ps1') -MsiPath $msiPath
+          & (Join-Path $env:GITHUB_WORKSPACE 'Installer\verify_windows_installer.ps1') -MsiPath $msiPath -ModernShellEnabled $modernShellEnabled -ModernSelfSigned $modernSelfSigned
+          if ($env:SELF_SIGN_BUILD -eq 'true') {
+            & (Join-Path $env:GITHUB_WORKSPACE 'Installer\Sign-WindowsFiles.ps1') -Files $msiPath
+          }
 
           $setupSfx = Join-Path $env:GITHUB_WORKSPACE "CPP\7zip\Bundles\SFXSetup\$env:BUILD_ARCH\7zS.sfx"
           if (-not (Test-Path -LiteralPath $setupSfx)) {
@@ -289,6 +374,9 @@ jobs:
           finally {
             $setupStream.Dispose()
           }
+          if ($env:SELF_SIGN_BUILD -eq 'true') {
+            & (Join-Path $env:GITHUB_WORKSPACE 'Installer\Sign-WindowsFiles.ps1') -Files $setupExe
+          }
 
       - name: Verify Windows distribution
         run: python Installer/verify_distribution.py windows ${{ matrix.arch }} dist/windows-${{ matrix.arch }}
@@ -300,6 +388,19 @@ jobs:
           path: dist/windows-${{ matrix.arch }}/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Remove ephemeral signing credentials
+        if: always() && vars.WINDOWS_SIGNING_MODE == 'self-signed' && github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $configPath = Join-Path $env:GITHUB_WORKSPACE 'Installer\ModernShell\self-signing.json'
+          if (Test-Path -LiteralPath $configPath) {
+            $thumbprint = (Get-Content $configPath -Raw | ConvertFrom-Json).thumbprint
+            foreach ($store in @('My', 'TrustedPeople', 'Root')) {
+              $path = "Cert:\CurrentUser\$store\$thumbprint"
+              if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
+            }
+          }
 
   macos:
     name: macOS ${{ matrix.arch }}
