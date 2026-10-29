@@ -4,6 +4,14 @@
 #define IDM_MENU          71
 #define IDR_ACCELERATOR1  72
 
+#define IDI_TOOLBAR_ADD      51000
+#define IDI_TOOLBAR_EXTRACT  51001
+#define IDI_TOOLBAR_TEST     51002
+#define IDI_TOOLBAR_COPY     51003
+#define IDI_TOOLBAR_MOVE     51004
+#define IDI_TOOLBAR_DELETE   51005
+#define IDI_TOOLBAR_INFO     51006
+
 #define IDB_ADD      100
 #define IDB_EXTRACT  101
 #define IDB_TEST     102

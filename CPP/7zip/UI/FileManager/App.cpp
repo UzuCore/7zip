@@ -166,8 +166,13 @@ static void CreateToolbar(HWND parent,
   toolBar.ButtonStructSize();
 
   imageList.Create(
-      largeButtons ? 48: 24,
-      largeButtons ? 36: 24,
+      #ifdef UNDER_CE
+      largeButtons ? 48 : 24,
+      largeButtons ? 36 : 24,
+      #else
+      largeButtons ? 36 : 24,
+      largeButtons ? 36 : 24,
+      #endif
       ILC_MASK | ILC_COLOR32, 0, 0);
   toolBar.SetImageList(0, imageList);
 }
@@ -178,6 +183,7 @@ struct CButtonInfo
   int CommandID;
   UINT BitmapResID;
   UINT Bitmap2ResID;
+  UINT IconResID;
   UINT StringResID;
 
   UString GetText() const { return LangString(StringResID); }
@@ -185,17 +191,17 @@ struct CButtonInfo
 
 static const CButtonInfo g_StandardButtons[] =
 {
-  { IDM_COPY_TO,    IDB_COPY,   IDB_COPY2,   IDS_BUTTON_COPY },
-  { IDM_MOVE_TO,    IDB_MOVE,   IDB_MOVE2,   IDS_BUTTON_MOVE },
-  { IDM_DELETE,     IDB_DELETE, IDB_DELETE2, IDS_BUTTON_DELETE } ,
-  { IDM_PROPERTIES, IDB_INFO,   IDB_INFO2,   IDS_BUTTON_INFO }
+  { IDM_COPY_TO,    IDB_COPY,   IDB_COPY2, IDI_TOOLBAR_COPY,   IDS_BUTTON_COPY },
+  { IDM_MOVE_TO,    IDB_MOVE,   IDB_MOVE2, IDI_TOOLBAR_MOVE,   IDS_BUTTON_MOVE },
+  { IDM_DELETE,     IDB_DELETE, IDB_DELETE2, IDI_TOOLBAR_DELETE, IDS_BUTTON_DELETE } ,
+  { IDM_PROPERTIES, IDB_INFO,   IDB_INFO2, IDI_TOOLBAR_INFO,   IDS_BUTTON_INFO }
 };
 
 static const CButtonInfo g_ArchiveButtons[] =
 {
-  { kMenuCmdID_Toolbar_Add,     IDB_ADD,     IDB_ADD2,     IDS_ADD },
-  { kMenuCmdID_Toolbar_Extract, IDB_EXTRACT, IDB_EXTRACT2, IDS_EXTRACT },
-  { kMenuCmdID_Toolbar_Test,    IDB_TEST,    IDB_TEST2,    IDS_TEST }
+  { kMenuCmdID_Toolbar_Add,     IDB_ADD,     IDB_ADD2, IDI_TOOLBAR_ADD,     IDS_ADD },
+  { kMenuCmdID_Toolbar_Extract, IDB_EXTRACT, IDB_EXTRACT2, IDI_TOOLBAR_EXTRACT, IDS_EXTRACT },
+  { kMenuCmdID_Toolbar_Test,    IDB_TEST,    IDB_TEST2, IDI_TOOLBAR_TEST,    IDS_TEST }
 };
 
 static bool SetButtonText(int commandID, const CButtonInfo *buttons, unsigned numButtons, UString &s)
@@ -237,14 +243,26 @@ static void AddButton(
     but.iString = (INT_PTR)(LPCWSTR)s;
 
   but.iBitmap = imageList.GetImageCount();
-  HBITMAP b = ::LoadBitmap(g_hInstance,
-      large ?
-      MAKEINTRESOURCE(butInfo.BitmapResID):
-      MAKEINTRESOURCE(butInfo.Bitmap2ResID));
-  if (b)
+  bool iconAdded = false;
+  #ifndef UNDER_CE
+  const int iconSize = large ? 36 : 24;
+  HICON icon = (HICON)::LoadImage(g_hInstance, MAKEINTRESOURCE(butInfo.IconResID),
+      IMAGE_ICON, iconSize, iconSize, LR_DEFAULTCOLOR);
+  if (icon)
   {
-    imageList.AddMasked(b, RGB(255, 0, 255));
-    ::DeleteObject(b);
+    iconAdded = imageList.AddIcon(icon) >= 0;
+    ::DestroyIcon(icon);
+  }
+  #endif
+  if (!iconAdded)
+  {
+    HBITMAP b = ::LoadBitmap(g_hInstance,
+        large ? MAKEINTRESOURCE(butInfo.BitmapResID) : MAKEINTRESOURCE(butInfo.Bitmap2ResID));
+    if (b)
+    {
+      imageList.AddMasked(b, RGB(255, 0, 255));
+      ::DeleteObject(b);
+    }
   }
   #ifdef _UNICODE
   toolBar.AddButton(1, &but);

@@ -167,6 +167,14 @@ IDI_ICON  ICON  "../../UI/FileManager/FM.ico"
 1  24  MOVEABLE PURE   "../../UI/FileManager/7zFM.exe.manifest"
 #endif
 
+IDI_TOOLBAR_ADD ICON "../../UI/FileManager/ToolbarColor01/Compress.ico"
+IDI_TOOLBAR_EXTRACT ICON "../../UI/FileManager/ToolbarColor01/Extract.ico"
+IDI_TOOLBAR_TEST ICON "../../UI/FileManager/ToolbarColor01/Test.ico"
+IDI_TOOLBAR_COPY ICON "../../UI/FileManager/ToolbarColor01/Copy.ico"
+IDI_TOOLBAR_MOVE ICON "../../UI/FileManager/ToolbarColor01/Move.ico"
+IDI_TOOLBAR_DELETE ICON "../../UI/FileManager/ToolbarColor01/Delete.ico"
+IDI_TOOLBAR_INFO ICON "../../UI/FileManager/ToolbarColor01/Info.ico"
+
 IDB_ADD        BITMAP  "../../UI/FileManager/Add.bmp"
 IDB_EXTRACT    BITMAP  "../../UI/FileManager/Extract.bmp"
 IDB_TEST       BITMAP  "../../UI/FileManager/Test.bmp"

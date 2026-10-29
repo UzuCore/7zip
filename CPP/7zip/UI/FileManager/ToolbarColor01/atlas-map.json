@@ -1,0 +1,120 @@
+{
+  "source": "Assets\\UI\\toolbar-color01-transparent.png",
+  "source_size": [
+    1774,
+    887
+  ],
+  "sizes": [
+    24,
+    36,
+    48,
+    64
+  ],
+  "icons": [
+    {
+      "name": "Compress",
+      "cell": [
+        0,
+        0,
+        444,
+        444
+      ],
+      "body_bounds_in_cell": [
+        75,
+        97,
+        397,
+        412
+      ]
+    },
+    {
+      "name": "Extract",
+      "cell": [
+        444,
+        0,
+        887,
+        444
+      ],
+      "body_bounds_in_cell": [
+        47,
+        65,
+        403,
+        422
+      ]
+    },
+    {
+      "name": "Test",
+      "cell": [
+        887,
+        0,
+        1330,
+        444
+      ],
+      "body_bounds_in_cell": [
+        58,
+        97,
+        380,
+        414
+      ]
+    },
+    {
+      "name": "Copy",
+      "cell": [
+        1330,
+        0,
+        1774,
+        444
+      ],
+      "body_bounds_in_cell": [
+        62,
+        91,
+        360,
+        420
+      ]
+    },
+    {
+      "name": "Move",
+      "cell": [
+        0,
+        444,
+        444,
+        887
+      ],
+      "body_bounds_in_cell": [
+        98,
+        56,
+        383,
+        383
+      ]
+    },
+    {
+      "name": "Delete",
+      "cell": [
+        444,
+        444,
+        887,
+        887
+      ],
+      "body_bounds_in_cell": [
+        79,
+        45,
+        368,
+        388
+      ]
+    },
+    {
+      "name": "Info",
+      "cell": [
+        887,
+        444,
+        1330,
+        887
+      ],
+      "body_bounds_in_cell": [
+        58,
+        61,
+        379,
+        383
+      ]
+    }
+  ]
+}
