@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="ko-KR" Codepage="949">
+  <String Id="InstallerLanguage" Value="1042" />
+  <String Id="DowngradeMessage" Value="최신 버전의 7zip+α가 이미 설치되어 있습니다." />
+  <String Id="OptionsTitle" Value="[ProductName] 설치 옵션" />
+  <String Id="ConsentHeading" Value="관리자 권한 및 인증서 안내" />
+  <String Id="AdministratorNotice" Value="설치하려면 관리자 권한이 필요합니다. Windows 권한 요청 창에서 '예'를 선택해 주세요." />
+  <String Id="TrustNotice" Value="Windows 11 첫 우클릭 메뉴를 사용하려면 자체 서명 인증서를 이 컴퓨터의 '신뢰할 수 있는 사람' 저장소에 등록해야 합니다. 이 인증서로 서명한 다른 코드도 신뢰 대상이 됩니다. 등록하지 않아도 프로그램과 기존 우클릭 메뉴는 사용할 수 있습니다." />
+  <String Id="Fingerprint" Value="인증서: 7zipAlpha UzuCore&#10;지문: $(var.SelfSigningThumbprint)" />
+  <String Id="Consent" Value="인증서 신뢰 등록에 동의하고 Windows 11 우클릭 메뉴를 사용합니다." />
+  <String Id="Install" Value="설치" />
+  <String Id="Cancel" Value="취소" />
+  <String Id="FileManagerShortcut" Value="7zip+α 파일 관리자" />
+</WixLocalization>

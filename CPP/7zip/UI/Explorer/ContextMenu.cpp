@@ -929,7 +929,7 @@ Z7_COMWF_B CZipContextMenu::QueryContextMenu(HMENU hMenu, UINT indexMenu,
     }
 
 
-    if ((contextMenuFlags & NContextMenuFlags::kCompressEach) != 0)
+    if (_fileNames.Size() > 1 && (contextMenuFlags & NContextMenuFlags::kCompressEach) != 0)
     {
       CCommandMapItem cmi;
       cmi.Folder = _dropMode ? _dropPath : fs2us(folderPrefix);

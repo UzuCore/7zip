@@ -16,6 +16,7 @@
 #include "BrowseDialog2.h"
 #include "HelpUtils.h"
 #include "LangUtils.h"
+#include "UpdateCheck.h"
 #include "MyLoadMenu.h"
 #include "RegistryUtils.h"
 
@@ -367,6 +368,7 @@ void MyLoadMenu(bool needResetMenu)
   }
   #endif
 
+  AddUpdateMenu(baseMenu);
   if (menuWasChanged)
     ::DrawMenuBar(hWnd);
 
@@ -920,6 +922,11 @@ bool OnMenuCommand(HWND hWnd, unsigned id)
     // Help
     case IDM_HELP_CONTENTS:
       ShowHelpWindow(kFMHelpTopic);
+      break;
+    case IDM_CHECK_UPDATES: RunUpdateCheck(hWnd, true); break;
+    case IDM_AUTO_UPDATES:
+      ToggleAutomaticUpdates();
+      AddUpdateMenu(::GetMenu(hWnd));
       break;
     case IDM_ABOUT:
     {

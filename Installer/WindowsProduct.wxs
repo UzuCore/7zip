@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="$(var.ProductName)" Manufacturer="UzuCore" Version="$(var.PackageVersion)"
-           UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine" Codepage="949">
+  <?ifndef BuildProductCode ?>
+    <?define BuildProductCode = "*" ?>
+  <?endif?>
+  <Package ProductCode="$(var.BuildProductCode)" Name="$(var.ProductName)" Manufacturer="UzuCore" Version="$(var.PackageVersion)"
+           UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine" Language="!(loc.InstallerLanguage)" Codepage="949">
     <SummaryInformation Codepage="949" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of 7zip+α is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="!(loc.DowngradeMessage)" />
     <!-- Keep Explorer and other shell-extension hosts running during upgrades.
          Locked DLLs use FilesInUse handling instead of Restart Manager shutdown. -->
     <Property Id="MSIRESTARTMANAGERCONTROL" Value="DisableShutdown" />
@@ -18,17 +21,17 @@
     <UI>
       <TextStyle Id="SelfSigningFont" FaceName="Segoe UI" Size="9" />
       <TextStyle Id="SelfSigningTitleFont" FaceName="Segoe UI" Size="12" Bold="yes" />
-      <Dialog Id="SelfSigningConsentDlg" Width="390" Height="300" Title="[ProductName] 설치 옵션" NoMinimize="yes">
-        <Control Id="Heading" Type="Text" X="18" Y="14" Width="354" Height="24" Text="{\SelfSigningTitleFont}관리자 권한 및 인증서 안내" />
-        <Control Id="AdministratorNotice" Type="Text" X="18" Y="46" Width="354" Height="35" Text="{\SelfSigningFont}설치하려면 관리자 권한이 필요합니다. Windows 권한 요청 창에서 '예'를 선택해 주세요." />
-        <Control Id="TrustNotice" Type="Text" X="18" Y="88" Width="354" Height="73" Text="{\SelfSigningFont}Windows 11 첫 우클릭 메뉴를 사용하려면 자체 서명 인증서를 이 컴퓨터의 '신뢰할 수 있는 사람' 저장소에 등록해야 합니다. 이 인증서로 서명한 다른 코드도 신뢰 대상이 됩니다. 등록하지 않아도 프로그램과 기존 우클릭 메뉴는 사용할 수 있습니다." />
-        <Control Id="Fingerprint" Type="Text" X="18" Y="168" Width="354" Height="33" Text="{\SelfSigningFont}인증서: 7zipAlpha UzuCore&#10;지문: $(var.SelfSigningThumbprint)" />
-        <Control Id="Consent" Type="CheckBox" X="18" Y="210" Width="354" Height="30" Property="SELF_SIGNED_MENU_CONSENT" CheckBoxValue="1" Text="{\SelfSigningFont}인증서 신뢰 등록에 동의하고 Windows 11 우클릭 메뉴를 사용합니다." />
+      <Dialog Id="SelfSigningConsentDlg" Width="390" Height="300" Title="!(loc.OptionsTitle)" NoMinimize="yes">
+        <Control Id="Heading" Type="Text" X="18" Y="14" Width="354" Height="24" Text="{\SelfSigningTitleFont}!(loc.ConsentHeading)" />
+        <Control Id="AdministratorNotice" Type="Text" X="18" Y="46" Width="354" Height="35" Text="{\SelfSigningFont}!(loc.AdministratorNotice)" />
+        <Control Id="TrustNotice" Type="Text" X="18" Y="88" Width="354" Height="73" Text="{\SelfSigningFont}!(loc.TrustNotice)" />
+        <Control Id="Fingerprint" Type="Text" X="18" Y="168" Width="354" Height="33" Text="{\SelfSigningFont}!(loc.Fingerprint)" />
+        <Control Id="Consent" Type="CheckBox" X="18" Y="210" Width="354" Height="30" Property="SELF_SIGNED_MENU_CONSENT" CheckBoxValue="1" Text="{\SelfSigningFont}!(loc.Consent)" />
         <Control Id="Line" Type="Line" X="0" Y="256" Width="390" Height="0" />
-        <Control Id="Install" Type="PushButton" X="220" Y="270" Width="75" Height="18" Default="yes" Text="설치">
+        <Control Id="Install" Type="PushButton" X="220" Y="270" Width="75" Height="18" Default="yes" Text="!(loc.Install)">
           <Publish Event="EndDialog" Value="Return" />
         </Control>
-        <Control Id="Cancel" Type="PushButton" X="302" Y="270" Width="70" Height="18" Cancel="yes" Text="취소">
+        <Control Id="Cancel" Type="PushButton" X="302" Y="270" Width="70" Height="18" Cancel="yes" Text="!(loc.Cancel)">
           <Publish Event="EndDialog" Value="Exit" />
         </Control>
       </Dialog>

@@ -1,6 +1,7 @@
 // ExtractEngine.cpp
 
 #include "StdAfx.h"
+#include "SetupLocale.h"
 
 #include "../../../Windows/FileDir.h"
 #include "../../../Windows/FileName.h"
@@ -18,8 +19,8 @@ using namespace NWindows;
 using namespace NFile;
 using namespace NDir;
 
-static LPCSTR const kCantFindArchive = "Cannot find archive file";
-static LPCSTR const kCantOpenArchive = "Cannot open the file as archive";
+static LPCWSTR const kCantFindArchive = SetupText(L"Cannot find archive file", L"\uc124\uce58 \uc555\ucd95 \ud30c\uc77c\uc744 \ucc3e\uc744 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.");
+static LPCWSTR const kCantOpenArchive = SetupText(L"Cannot open the file as archive", L"\uc124\uce58 \uc555\ucd95 \ud30c\uc77c\uc744 \uc5f4 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.");
 
 struct CThreadExtracting
 {

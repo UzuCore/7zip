@@ -1,6 +1,7 @@
 // Main.cpp
 
 #include "StdAfx.h"
+#include "SetupLocale.h"
 
 #include "../../../../C/DllSecur.h"
 
@@ -104,7 +105,7 @@ static bool ReadDataString(CFSTR fileName, AString &stringResult)
 }
 
 #if defined(_WIN32) && defined(_UNICODE) && !defined(_WIN64) && !defined(UNDER_CE)
-#define NT_CHECK_FAIL_ACTION ShowErrorMessage(L"Unsupported Windows version"); return 1;
+#define NT_CHECK_FAIL_ACTION ShowErrorMessage(SetupText(L"Unsupported Windows version", L"\uc9c0\uc6d0\ud558\uc9c0 \uc54a\ub294 Windows \ubc84\uc804\uc785\ub2c8\ub2e4.")); return 1;
 #endif
 
 static void ShowErrorMessageSpec(const UString &name)
@@ -128,6 +129,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
     /* lpCmdLine */,int /* nCmdShow */)
 {
   g_hInstance = (HINSTANCE)hInstance;
+
+  SetThreadUILanguage(IsKoreanSetup() ? MAKELANGID(LANG_KOREAN, SUBLANG_KOREAN) : MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
 
   NT_CHECK
 
@@ -159,7 +162,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   if (!ReadDataString(fullPath, config))
   {
     if (!assumeYes)
-      ShowErrorMessage(L"Can't load config info");
+      ShowErrorMessage(SetupText(L"Can't load config info", L"\uc124\uce58 \uc124\uc815\uc744 \ubd88\ub7ec\uc62c \uc218 \uc5c6\uc2b5\ub2c8\ub2e4."));
     return 1;
   }
 
@@ -172,7 +175,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
     if (!GetTextConfig(config, pairs))
     {
       if (!assumeYes)
-        ShowErrorMessage(L"Config failed");
+        ShowErrorMessage(SetupText(L"Config failed", L"\uc124\uce58 \uc124\uc815\uc774 \uc62c\ubc14\ub974\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4."));
       return 1;
     }
     const UString friendlyName = GetTextConfigValue(pairs, "Title");
@@ -194,6 +197,12 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
     #ifdef MY_SHELL_EXECUTE
     executeFile = GetTextConfigValue(pairs, "ExecuteFile");
     executeParameters = GetTextConfigValue(pairs, "ExecuteParameters");
+    if (IsKoreanSetup())
+    {
+      const UString koreanParameters = GetTextConfigValue(pairs, "ExecuteParameters_ko");
+      if (!koreanParameters.IsEmpty())
+        executeParameters = koreanParameters;
+    }
     #endif
   }
 
@@ -201,7 +210,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   if (!tempDir.Create(kTempDirPrefix))
   {
     if (!assumeYes)
-      ShowErrorMessage(L"Cannot create temp folder archive");
+      ShowErrorMessage(SetupText(L"Cannot create temp folder archive", L"\uc124\uce58\uc6a9 \uc784\uc2dc \ud3f4\ub354\ub97c \ub9cc\ub4e4 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4."));
     return 1;
   }
 
@@ -211,7 +220,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
     const HRESULT result = codecs->Load();
     if (result != S_OK)
     {
-      ShowErrorMessage(L"Cannot load codecs");
+      ShowErrorMessage(SetupText(L"Cannot load codecs", L"\uc555\ucd95 \ucf54\ub371\uc744 \ubd88\ub7ec\uc62c \uc218 \uc5c6\uc2b5\ub2c8\ub2e4."));
       return 1;
     }
   }
@@ -286,7 +295,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
     if (result <= 32)
     {
       if (!assumeYes)
-        ShowErrorMessage(L"Cannot open file");
+        ShowErrorMessage(SetupText(L"Cannot open file", L"\uc124\uce58 \ud30c\uc77c\uc744 \uc5f4 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4."));
       return 1;
     }
     hProcess = execInfo.hProcess;
@@ -300,7 +309,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
       if (!NFind::DoesFileExist_FollowLink(us2fs(appLaunched)))
       {
         if (!assumeYes)
-          ShowErrorMessage(L"Cannot find setup.exe");
+          ShowErrorMessage(SetupText(L"Cannot find setup.exe", L"\uc124\uce58 \ud504\ub85c\uadf8\ub7a8\uc744 \ucc3e\uc744 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4."));
         return 1;
       }
     }
@@ -353,7 +362,10 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   if (hProcess)
   {
     WaitForSingleObject(hProcess, INFINITE);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(hProcess, &exitCode);
     ::CloseHandle(hProcess);
+    return (int)exitCode;
   }
   return 0;
 }

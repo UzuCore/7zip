@@ -1,6 +1,7 @@
 // ExtractCallbackSfx.h
 
 #include "StdAfx.h"
+#include "SetupLocale.h"
 
 #include "../../../Common/Wildcard.h"
 
@@ -15,9 +16,9 @@ using namespace NWindows;
 using namespace NFile;
 using namespace NDir;
 
-static LPCSTR const kCantDeleteFile = "Cannot delete output file";
-static LPCSTR const kCantOpenFile = "Cannot open output file";
-static LPCSTR const kUnsupportedMethod = "Unsupported Method";
+static LPCWSTR const kCantDeleteFile = SetupText(L"Cannot delete output file", L"\ucd9c\ub825 \ud30c\uc77c\uc744 \uc0ad\uc81c\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.");
+static LPCWSTR const kCantOpenFile = SetupText(L"Cannot open output file", L"\ucd9c\ub825 \ud30c\uc77c\uc744 \uc5f4 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.");
+static LPCWSTR const kUnsupportedMethod = SetupText(L"Unsupported Method", L"\uc9c0\uc6d0\ud558\uc9c0 \uc54a\ub294 \uc555\ucd95 \ubc29\uc2dd\uc785\ub2c8\ub2e4.");
 
 void CExtractCallbackImp::Init(IInArchive *archiveHandler,
     const FString &directoryPath,

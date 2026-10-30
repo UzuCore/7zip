@@ -1,6 +1,7 @@
 // FM.cpp
 
 #include "StdAfx.h"
+#include "UpdateCheck.h"
 
 #include "../../../Common/MyWindows.h"
 
@@ -1029,6 +1030,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       }
 
       g_WindowWasCreated = true;
+      RunUpdateCheck(hWnd, false);
       
       // g_SplitterPos = 0;
 

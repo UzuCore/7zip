@@ -170,7 +170,13 @@ bool CProgressDialog::OnButtonClicked(unsigned buttonID, HWND buttonHWND)
       bool paused = Sync.GetPaused();
       Sync.SetPaused(true);
       _inCancelMessageBox = true;
-      int res = ::MessageBoxW(*this, L"Are you sure you want to cancel?", _title, MB_YESNOCANCEL);
+      #ifdef Z7_SFX_SETUP
+      const wchar_t *cancelPrompt = PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_KOREAN
+          ? L"\uc124\uce58 \ud30c\uc77c \uc555\ucd95 \ud480\uae30\ub97c \ucde8\uc18c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?" : L"Are you sure you want to cancel?";
+      #else
+      const wchar_t *cancelPrompt = L"Are you sure you want to cancel?";
+      #endif
+      int res = ::MessageBoxW(*this, cancelPrompt, _title, MB_YESNOCANCEL);
       _inCancelMessageBox = false;
       Sync.SetPaused(paused);
       if (res == IDCANCEL || res == IDNO)

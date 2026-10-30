@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US" Codepage="949">
+  <String Id="InstallerLanguage" Value="1033" />
+  <String Id="DowngradeMessage" Value="A newer version of 7zip+α is already installed." />
+  <String Id="OptionsTitle" Value="[ProductName] Setup Options" />
+  <String Id="ConsentHeading" Value="Administrator privileges and certificate trust" />
+  <String Id="AdministratorNotice" Value="Administrator privileges are required. Select Yes when Windows asks for permission." />
+  <String Id="TrustNotice" Value="To use the Windows 11 context menu, this computer must trust the self-signed certificate in the Trusted People store. Other code signed with this certificate will also be trusted. Without this registration, the application and classic context menu remain available." />
+  <String Id="Fingerprint" Value="Certificate: 7zipAlpha UzuCore&#10;Thumbprint: $(var.SelfSigningThumbprint)" />
+  <String Id="Consent" Value="I agree to trust this certificate and enable the Windows 11 context menu." />
+  <String Id="Install" Value="Install" />
+  <String Id="Cancel" Value="Cancel" />
+  <String Id="FileManagerShortcut" Value="7zip+α File Manager" />
+</WixLocalization>

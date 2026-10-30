@@ -28,8 +28,25 @@ It does not silently take over archive default apps; the file manager's options
 can configure associations as with upstream. On Windows 11, the classic shell
 extension appears under **Show more options**. The file manager automatically
 selects the system language using shipped language files; Korean is Lang/ko.txt.
-MSI installer dialogs remain English, as with the upstream English MSI baseline.
+The setup EXE selects Korean for a Korean Windows display language and English
+otherwise. A single MSI contains the Korean UI as the embedded `ko-KR` transform.
+Direct MSI installation defaults to English; use `msiexec /i package.msi
+TRANSFORMS=:ko-KR` to select Korean explicitly.
 Explorer may need a restart or sign-out to refresh a newly installed extension.
+
+The Windows file manager checks GitHub Releases once per day at startup. Help
+contains **Check for updates** and a persistent **Automatically check for updates**
+toggle (enabled by default). A new build, including another build on the same
+date, prompts before downloading and running the installer. Administrator
+permission and the installer consent screens remain interactive. Portable builds
+also prompt before installing; their files are not overwritten in place.
+
+`UpdateConfig.json` records the build ID, architecture and pinned signing
+certificate. The release workflow publishes `update-windows.json` with both
+installer hashes. The updater checks HTTPS release locations, SHA-256 and the
+pinned Authenticode signer before launching a download. No certificate trust
+store changes are made by the update checker. Signing-key rotation requires an
+explicitly distributed installer with the new pinned identity.
 
 ## Linux x64 / ARM64
 

@@ -28,13 +28,20 @@ if (-not $sdk) { throw 'Windows SDK SignTool was not found.' }
 foreach ($file in $Files) {
     Write-Host "Signing: $file"
     $signArgs = @('sign', '/fd', 'SHA256', '/sha1', $config.thumbprint, '/s', 'My', '/tr', 'http://timestamp.digicert.com', '/td', 'SHA256', ('"' + $file + '"'))
-    $process = Start-Process -FilePath $sdk.FullName -ArgumentList $signArgs -NoNewWindow -PassThru
+    $process = New-Object Diagnostics.Process
+    $process.StartInfo.FileName = $sdk.FullName
+    $process.StartInfo.Arguments = $signArgs -join ' '
+    $process.StartInfo.UseShellExecute = $false
+    $process.StartInfo.CreateNoWindow = $true
+    [void]$process.Start()
     if (-not $process.WaitForExit(120000)) {
         $process.Kill()
         $process.WaitForExit()
         throw "Signing timed out after 120 seconds: $file"
     }
-    if ($process.ExitCode -ne 0) { throw "Signing failed (exit $($process.ExitCode)): $file" }
+    $exitCode = $process.ExitCode
+    $process.Dispose()
+    if ($exitCode -ne 0) { throw "Signing failed (exit $exitCode): $file" }
     Write-Host "Verifying signature: $file"
     $signature = Get-AuthenticodeSignature -LiteralPath $file
     if ($signature.SignerCertificate.Thumbprint -ne $config.thumbprint) { throw "Signature identity verification failed: $file" }
