@@ -398,7 +398,8 @@ jobs:
           $configPath = Join-Path $env:GITHUB_WORKSPACE 'Installer\ModernShell\self-signing.json'
           if (Test-Path -LiteralPath $configPath) {
             $thumbprint = (Get-Content $configPath -Raw | ConvertFrom-Json).thumbprint
-            foreach ($store in @('My', 'TrustedPeople', 'Root')) {
+            # CurrentUser Root also exposes inherited machine certificates; remove at the import location.
+            foreach ($store in @('My', 'TrustedPeople')) {
               $path = "Cert:\CurrentUser\$store\$thumbprint"
               if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
             }
