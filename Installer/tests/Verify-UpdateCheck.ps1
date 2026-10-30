@@ -11,6 +11,7 @@ $thumbprint = (Get-AuthenticodeSignature -LiteralPath $SignedInstaller).SignerCe
 $global:SevenZipUpdateTesttag = 'build-2026.10.30'
 $global:SevenZipUpdateTesturl = 'https://github.com/UzuCore/7zip/releases/download/' + $global:SevenZipUpdateTesttag + '/update-windows.json'
 $global:SevenZipUpdateTestbuild = '101'
+$global:SevenZipUpdateTestattempt = 0
 $global:SevenZipUpdateTestpublisher = $thumbprint
 $global:SevenZipUpdateTestmissing = $false
 $global:SevenZipUpdateTestraw = $false
@@ -21,7 +22,7 @@ function Invoke-RestMethod {
         if (-not $global:SevenZipUpdateTestmissing) { $assets = @(@{ name='update-windows.json'; browser_download_url=$global:SevenZipUpdateTesturl }) }
         return [pscustomobject]@{ draft=$false; prerelease=$false; tag_name=$global:SevenZipUpdateTesttag; assets=$assets }
     }
-    $manifest = [pscustomobject]@{ schema=1; releaseTag=$global:SevenZipUpdateTesttag; buildId=$global:SevenZipUpdateTestbuild; windows=@{ x64=@{ name='7zip-windows-x64.exe'; sha256=('a'*64); publisherThumbprint=$global:SevenZipUpdateTestpublisher } } }
+    $manifest = [pscustomobject]@{ schema=1; releaseTag=$global:SevenZipUpdateTesttag; buildId=$global:SevenZipUpdateTestbuild; buildAttempt=$global:SevenZipUpdateTestattempt; windows=@{ x64=@{ name='7zip-windows-x64.exe'; sha256=('a'*64); publisherThumbprint=$global:SevenZipUpdateTestpublisher } } }
     if ($global:SevenZipUpdateTestraw) { return ($manifest | ConvertTo-Json -Depth 5) }
     return $manifest
 }
@@ -41,6 +42,10 @@ $global:SevenZipUpdateTestraw = $false
 $global:SevenZipUpdateTestbuild = '100'
 if ((& $checker -CheckOnly).Status -ne 'current') { throw 'Current build was not detected.' }
 Write-Output 'PASS: current build'
+$global:SevenZipUpdateTestattempt = 1
+if ((& $checker -CheckOnly).Status -ne 'available') { throw 'A newer CI attempt was not detected.' }
+Write-Output 'PASS: detects a newer attempt of the same CI run'
+$global:SevenZipUpdateTestattempt = 0
 $global:SevenZipUpdateTestbuild = '99'
 if ((& $checker -CheckOnly).Status -ne 'current') { throw 'Downgrade must not be offered.' }
 Write-Output 'PASS: older build is not offered'

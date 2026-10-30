@@ -32,6 +32,9 @@ class UpdateManifestTests(unittest.TestCase):
             config.write_text(json.dumps({"buildId": "124", "publisherThumbprint": "A" * 40}))
             result = subprocess.run(command, capture_output=True)
             self.assertNotEqual(result.returncode, 0)
+            config.write_text(json.dumps({"buildId": "123", "buildAttempt": 2, "publisherThumbprint": "A" * 40}))
+            result = subprocess.run(command, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
 
 
 if __name__ == "__main__":

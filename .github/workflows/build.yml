@@ -192,7 +192,8 @@ jobs:
           python -u Installer/stage_resources.py windows $env:BUILD_ARCH $artifactDir --extractor (Join-Path $artifactDir "7zz.exe")
           if ($LASTEXITCODE -ne 0) { throw "Could not stage Windows resources." }
           Write-Host 'Upstream Windows resources staged.'
-          python Installer/stage_update_config.py $artifactDir --arch $env:BUILD_ARCH --build-id $env:GITHUB_RUN_ID
+          $updateAttempt = if ($env:GITHUB_RUN_ATTEMPT) { [int]$env:GITHUB_RUN_ATTEMPT } else { 32768 }
+          python Installer/stage_update_config.py $artifactDir --arch $env:BUILD_ARCH --build-id $env:GITHUB_RUN_ID --build-attempt $updateAttempt
           if ($LASTEXITCODE -ne 0) { throw 'Could not stage update configuration.' }
           Copy-Item 'DOC\License.txt' $artifactDir
           Copy-Item 'DOC\copying.txt' $artifactDir
@@ -211,7 +212,16 @@ jobs:
           $packageVersion = "$versionMajor.$versionMinor.$env:GITHUB_RUN_NUMBER"
           $shellDir = Join-Path $artifactDir 'ShellIntegration'
           $publisher = if ($env:SHELL_PUBLISHER) { $env:SHELL_PUBLISHER } else { 'CN=UzuCore' }
-          $identityArgs = @('--arch', $env:BUILD_ARCH, '--version', "$packageVersion.0", '--publisher', $publisher, '--output', $shellDir)
+          $shellVersionArgs = @('--major', $versionMajor, '--minor', $versionMinor, '--run-number', $env:GITHUB_RUN_NUMBER)
+          if ($env:GITHUB_ACTIONS -eq 'true') {
+            $shellVersionArgs += @('--attempt', $env:GITHUB_RUN_ATTEMPT)
+          } else {
+            $shellVersionArgs += @('--local-state', (Join-Path $env:RUNNER_TEMP 'shell-version.json'))
+          }
+          $shellVersion = python Installer/shell_package_version.py @shellVersionArgs
+          if ($LASTEXITCODE -ne 0) { throw 'Could not generate a unique shell package version.' }
+          Write-Host "Windows shell package version: $shellVersion"
+          $identityArgs = @('--arch', $env:BUILD_ARCH, '--version', $shellVersion, '--publisher', $publisher, '--output', $shellDir)
           if ($env:SELF_SIGN_BUILD -eq 'true') { $identityArgs += '--self-signed' }
           python Installer/build_modern_shell.py @identityArgs
           if ($LASTEXITCODE -ne 0) { throw 'Could not generate Windows 11 shell identity.' }
@@ -544,7 +554,7 @@ jobs:
           echo "title=7-Zip ${release_title_date}" >> "$GITHUB_OUTPUT"
 
       - name: Verify update manifest generation
-        run: python3 Installer/tests/test_update_manifest.py
+        run: python3 -m unittest discover -s Installer/tests -p 'test_*.py'
 
       - name: Generate Windows update manifest
         run: python3 Installer/generate_update_manifest.py --artifacts release-assets --release release --tag "${{ steps.release-meta.outputs.tag }}"

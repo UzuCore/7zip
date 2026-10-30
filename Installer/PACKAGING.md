@@ -22,6 +22,15 @@ runtime files. MSI owns installation, upgrades, rollback, shortcuts and uninstal
 The setup EXE embeds the MSI. Explorer context/drag-drop handlers and COM classes
 are registered declaratively, including the x86 COM view on x64.
 
+MSIX shell versions use `major.minor.run-number.attempt` in CI, including reruns.
+Local previews must use the latest existing CI run number and its matching run
+ID, not a guessed future run number. `shell_package_version.py` assigns local
+revisions 32768 through 65535 using a persistent local state file. Rebuilding a
+local preview increments that revision; the next CI run has a larger third
+component and supersedes it. Two different package contents must never share an
+MSIX identity and version: Windows rejects that situation with 0x80073CFB, which
+causes MSI error 1722/1603 during shell registration.
+
 The fork uses its own shell CLSID ending in 0001, handler names, install directory
 and preference registry key (Software\7-Zip UzuCore) to coexist with upstream.
 It does not silently take over archive default apps; the file manager's options
@@ -41,9 +50,15 @@ date, prompts before downloading and running the installer. Administrator
 permission and the installer consent screens remain interactive. Portable builds
 also prompt before installing; their files are not overwritten in place.
 
+Update install logs are kept in `%LOCALAPPDATA%\UzuCore\7zipAlpha\InstallerLogs`.
+The setup EXE also creates `%TEMP%\7zip-alpha-setup.log` when the caller did not
+request an explicit MSI log. Shell registration keeps its separate transcript
+under `%ProgramData%\UzuCore\7zipAlpha\InstallerLogs`.
+
 `UpdateConfig.json` records the build ID, architecture and pinned signing
 certificate. The release workflow publishes `update-windows.json` with both
-installer hashes. The updater checks HTTPS release locations, SHA-256 and the
+installer hashes and the CI attempt. New attempts of the same CI run can also
+be offered as updates. The updater checks HTTPS release locations, SHA-256 and the
 pinned Authenticode signer before launching a download. No certificate trust
 store changes are made by the update checker. Signing-key rotation requires an
 explicitly distributed installer with the new pinned identity.

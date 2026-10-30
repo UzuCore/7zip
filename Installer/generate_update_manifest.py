@@ -15,6 +15,10 @@ for arch in ("x64", "arm64"):
     if "buildId" in manifest and manifest["buildId"] != config["buildId"]:
         raise SystemExit("Windows builds have different build identities")
     manifest["buildId"] = config["buildId"]
+    attempt = int(config.get("buildAttempt", 0))
+    if "buildAttempt" in manifest and manifest["buildAttempt"] != attempt:
+        raise SystemExit("Windows builds have different build attempts")
+    manifest["buildAttempt"] = attempt
     name = f"7zip-windows-{arch}.exe"
     manifest["windows"][arch] = {
         "name": name, "sha256": hashlib.sha256((a.release / name).read_bytes()).hexdigest(),

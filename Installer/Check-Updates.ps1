@@ -41,7 +41,11 @@ try {
     $manifest = Invoke-RestMethod -Uri ($baseUrl + 'update-windows.json') -Headers $headers -TimeoutSec 30
     if ($manifest -is [string]) { $manifest = $manifest | ConvertFrom-Json }
     if ($manifest.schema -ne 1 -or $manifest.releaseTag -cne $release.tag_name) { throw 'Invalid update manifest.' }
-    if ([UInt64]$manifest.buildId -le [UInt64]$config.buildId) {
+    $remoteBuild = [UInt64]$manifest.buildId
+    $localBuild = [UInt64]$config.buildId
+    $remoteAttempt = [int]$manifest.buildAttempt
+    $localAttempt = [int]$config.buildAttempt
+    if ($remoteBuild -lt $localBuild -or ($remoteBuild -eq $localBuild -and $remoteAttempt -le $localAttempt)) {
         if ($CheckOnly) { [pscustomobject]@{ Status = 'current' }; return }
         if ($Manual) { Notice (Text 'You are using the latest version.' '최신 버전을 사용하고 있습니다.') }
         return
@@ -60,8 +64,12 @@ try {
     $download = Join-Path $downloadDir $fileName
     Invoke-WebRequest -Uri ($baseUrl + $fileName) -OutFile $download -Headers $headers -UseBasicParsing -TimeoutSec 300
     Assert-UpdateInstaller -Path $download -Sha256 $asset.sha256 -PublisherThumbprint $config.publisherThumbprint
-    $process = Start-Process -FilePath $download -PassThru -Wait
-    if ($process.ExitCode -notin @(0, 3010, 1641, 1602)) { throw (Text "Setup failed (code $($process.ExitCode))." "설치하지 못했습니다(오류 코드 $($process.ExitCode)).") }
+    $logDirectory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'UzuCore\7zipAlpha\InstallerLogs'
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    $installLog = Join-Path $logDirectory ('update-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
+    # The setup SFX forwards its arguments to msiexec, including Korean mode.
+    $process = Start-Process -FilePath $download -ArgumentList @('/L*V', ('"' + $installLog + '"')) -PassThru -Wait
+    if ($process.ExitCode -notin @(0, 3010, 1641, 1602)) { throw (Text "Setup failed (code $($process.ExitCode)). Log: $installLog" "설치하지 못했습니다(오류 코드 $($process.ExitCode)). 설치 로그: $installLog") }
 } catch {
     if ($CheckOnly) { throw }
     if ($Manual -or $installationRequested) { Notice ((Text 'Could not check for or install an update.' '업데이트를 확인하거나 설치하지 못했습니다.') + "`n" + $_.Exception.Message) }

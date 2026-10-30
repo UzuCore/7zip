@@ -1,6 +1,9 @@
 # GNU make output directories
 _o/
 
+# Python tooling and test caches
+__pycache__/
+
 # Release signing keys belong in certificate stores / Actions secrets.
 *.pfx
 *.p12

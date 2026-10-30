@@ -281,6 +281,20 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
       executeParameters += switches;
     }
 
+    // Keep a diagnostic log even when launched by an older update checker.
+    if (executeFile.IsEqualTo_Ascii_NoCase("msiexec.exe") &&
+        switches.Find(L"/L") < 0 && switches.Find(L"/l") < 0)
+    {
+      wchar_t tempPath[MAX_PATH];
+      const DWORD length = GetTempPathW(MAX_PATH, tempPath);
+      if (length > 0 && length < MAX_PATH)
+      {
+        executeParameters += L" /L*V \"";
+        executeParameters += tempPath;
+        executeParameters += L"7zip-alpha-setup.log\"";
+      }
+    }
+
     const CSysString parametersSys (GetSystemString(executeParameters));
     if (parametersSys.IsEmpty())
       execInfo.lpParameters = NULL;
