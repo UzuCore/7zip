@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $source = Split-Path $PSScriptRoot -Parent
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('7zip-update-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixture | Out-Null
-foreach ($name in @('Check-Updates.ps1', 'Update-Verification.ps1')) {
+foreach ($name in @('Check-Updates.ps1', 'Update-Verification.ps1', 'Update-Processes.ps1')) {
     [IO.File]::WriteAllText((Join-Path $fixture $name), [IO.File]::ReadAllText((Join-Path $source $name)), (New-Object Text.UTF8Encoding($true)))
 }
 $thumbprint = (Get-AuthenticodeSignature -LiteralPath $SignedInstaller).SignerCertificate.Thumbprint

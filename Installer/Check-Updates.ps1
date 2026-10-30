@@ -1,6 +1,7 @@
 param([switch]$Manual, [switch]$CheckOnly, [ValidateSet('en','ko')][string]$Language = 'en')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Update-Verification.ps1')
+. (Join-Path $PSScriptRoot 'Update-Processes.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 function Text([string]$English, [string]$Korean) { if ($Language -eq 'ko') { $Korean } else { $English } }
 function Notice([string]$Message) { [void][Windows.Forms.MessageBox]::Show($Message, '7zip+α', 'OK', 'Information') }
@@ -19,7 +20,7 @@ try {
     if (-not ($Manual -or $CheckOnly)) {
         New-Item -Path $settingsPath -Force | Out-Null
         $settings = Get-ItemProperty -LiteralPath $settingsPath
-        if ($settings.Enabled -eq 0) { return }
+        if (-not (Test-AutomaticUpdateSetting $settings)) { return }
         if ($settings.LastCheckUtc) {
             $last = [DateTime]::Parse($settings.LastCheckUtc).ToUniversalTime()
             if (([DateTime]::UtcNow - $last).TotalHours -lt 24) { return }
@@ -56,7 +57,7 @@ try {
     if ($asset.name -cne $fileName -or $asset.sha256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid installer metadata.' }
     if (-not $config.publisherThumbprint -or $asset.publisherThumbprint -cne $config.publisherThumbprint) { throw (Text 'The update publisher does not match this installation.' '업데이트 게시자 인증서가 현재 설치본과 다릅니다.') }
     if ($CheckOnly) { [pscustomobject]@{ Status = 'available'; BuildId = $manifest.buildId; Name = $fileName }; return }
-    $prompt = Text ("A new version ($($release.tag_name)) is available. Download and install it? Windows may request administrator permission.") ("새 버전($($release.tag_name))이 있습니다. 다운로드하고 설치하시겠습니까? Windows에서 관리자 권한을 요청할 수 있습니다.")
+    $prompt = Text ("A new version ($($release.tag_name)) is available. Download and install it? File Manager windows will close before setup. Windows may request administrator permission.") ("새 버전($($release.tag_name))이 있습니다. 다운로드하고 설치하시겠습니까? 설치 전에 파일 관리자 창을 닫습니다. Windows에서 관리자 권한을 요청할 수 있습니다.")
     if ([Windows.Forms.MessageBox]::Show($prompt, '7zip+α', 'YesNo', 'Question') -ne 'Yes') { return }
     $installationRequested = $true
     $downloadDir = Join-Path ([IO.Path]::GetTempPath()) ('7zip-alpha-update-' + [guid]::NewGuid().ToString('N'))
@@ -64,6 +65,15 @@ try {
     $download = Join-Path $downloadDir $fileName
     Invoke-WebRequest -Uri ($baseUrl + $fileName) -OutFile $download -Headers $headers -UseBasicParsing -TimeoutSec 300
     Assert-UpdateInstaller -Path $download -Sha256 $asset.sha256 -PublisherThumbprint $config.publisherThumbprint
+    $applicationState = Close-UpdateFileManagers -InstallDirectory $PSScriptRoot
+    if (-not $applicationState.Ready) {
+        if ($applicationState.Reason -eq 'busy') {
+            Notice (Text 'An archive operation is running. Finish it and close this installation of 7zip+α before trying the update again.' '압축 또는 압축 풀기 작업이 실행 중입니다. 작업을 마치고 이 설치본의 7zip+α를 닫은 뒤 업데이트를 다시 시도해 주세요.')
+        } else {
+            Notice (Text 'File Manager did not close. Close it and try the update again. Setup has not started.' '파일 관리자가 종료되지 않았습니다. 프로그램을 닫고 업데이트를 다시 시도해 주세요. 설치는 시작하지 않았습니다.')
+        }
+        return
+    }
     $logDirectory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'UzuCore\7zipAlpha\InstallerLogs'
     New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
     $installLog = Join-Path $logDirectory ('update-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')

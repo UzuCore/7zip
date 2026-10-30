@@ -12,7 +12,7 @@ a = p.parse_args()
 root = Path(__file__).resolve().parent
 identity = json.loads((root / "ModernShell/self-signing.json").read_text(encoding="utf-8-sig"))
 # Windows PowerShell 5.1 needs a BOM to read Korean source text correctly.
-for name in ("Check-Updates.ps1", "Update-Verification.ps1"):
+for name in ("Check-Updates.ps1", "Update-Verification.ps1", "Update-Processes.ps1"):
     script = (root / name).read_text(encoding="utf-8-sig")
     (a.destination / name).write_text(script, encoding="utf-8-sig")
 (a.destination / "UpdateConfig.json").write_text(json.dumps({

@@ -408,6 +408,7 @@ jobs:
           if ($env:SELF_SIGN_BUILD -eq 'true') {
             & (Join-Path $env:GITHUB_WORKSPACE 'Installer\Sign-WindowsFiles.ps1') -Files $setupExe
             & (Join-Path $env:GITHUB_WORKSPACE 'Installer\tests\Verify-UpdateCheck.ps1') -SignedInstaller $setupExe
+            & (Join-Path $env:GITHUB_WORKSPACE 'Installer\tests\Verify-UpdateProcesses.ps1')
           }
 
       - name: Verify Windows distribution

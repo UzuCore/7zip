@@ -7,14 +7,14 @@
 inline bool AutomaticUpdatesEnabled()
 {
   HKEY key;
-  DWORD enabled = 1, size = sizeof(enabled), type = 0;
+  DWORD enabled = 0, size = sizeof(enabled), type = 0;
   if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\7-Zip UzuCore\\Updates", 0, KEY_QUERY_VALUE, &key) == ERROR_SUCCESS)
   {
     if (RegQueryValueExW(key, L"Enabled", NULL, &type, (BYTE *)&enabled, &size) != ERROR_SUCCESS || type != REG_DWORD)
-      enabled = 1;
+      enabled = 0;
     RegCloseKey(key);
   }
-  return enabled != 0;
+  return enabled == 1;
 }
 inline void ToggleAutomaticUpdates()
 {

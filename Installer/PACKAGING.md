@@ -45,10 +45,16 @@ Explorer may need a restart or sign-out to refresh a newly installed extension.
 
 The Windows file manager checks GitHub Releases once per day at startup. Help
 contains **Check for updates** and a persistent **Automatically check for updates**
-toggle (enabled by default). A new build, including another build on the same
+toggle (disabled by default). A new build, including another build on the same
 date, prompts before downloading and running the installer. Administrator
 permission and the installer consent screens remain interactive. Portable builds
 also prompt before installing; their files are not overwritten in place.
+
+After the download and its signature are verified, the updater requests a normal
+close of File Manager windows from the same installation and current session.
+If an archive job is active, a close is refused, or a window does not exit in
+15 seconds, setup is deferred. The updater never force-kills archive jobs or
+Windows Explorer. Existing explicit automatic-check preferences are preserved.
 
 Update install logs are kept in `%LOCALAPPDATA%\UzuCore\7zipAlpha\InstallerLogs`.
 The setup EXE also creates `%TEMP%\7zip-alpha-setup.log` when the caller did not
