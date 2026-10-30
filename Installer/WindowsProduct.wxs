@@ -6,7 +6,7 @@
   <Package ProductCode="$(var.BuildProductCode)" Name="$(var.ProductName)" Manufacturer="UzuCore" Version="$(var.PackageVersion)"
            UpgradeCode="{D2694AE4-2A6D-49A4-89D5-BD1502DF9E3C}" Scope="perMachine" Language="!(loc.InstallerLanguage)" Codepage="949">
     <SummaryInformation Codepage="949" />
-    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="!(loc.DowngradeMessage)" />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" IgnoreLanguage="yes" Schedule="afterInstallInitialize" DowngradeErrorMessage="!(loc.DowngradeMessage)" />
     <!-- Keep Explorer and other shell-extension hosts running during upgrades.
          Locked DLLs use FilesInUse handling instead of Restart Manager shutdown. -->
     <Property Id="MSIRESTARTMANAGERCONTROL" Value="DisableShutdown" />
@@ -85,7 +85,7 @@
       <?endif?>
     </Feature>
     <StandardDirectory Id="ProgramFiles6432Folder">
-      <Directory Id="INSTALLFOLDER" Name="7-Zip UzuCore">
+      <Directory Id="INSTALLFOLDER" Name="7z alpha">
         <Component Id="ShellIntegration" Guid="*">
           <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{23170F69-40C1-278A-1000-000100020001}\InprocServer32" Type="string" Value="[INSTALLFOLDER]7-zip.dll" KeyPath="yes" />
           <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{23170F69-40C1-278A-1000-000100020001}\InprocServer32" Name="ThreadingModel" Type="string" Value="Apartment" />

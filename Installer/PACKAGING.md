@@ -1,7 +1,8 @@
 # 7zip+α distribution baseline
 
-The displayed application name is **7zip+α**. Legacy install paths, registry keys
-and UpgradeCode remain stable so previous UzuCore packages can be upgraded.
+The displayed application name is **7zip+α**. The default Windows directory is
+`C:\Program Files\7z alpha`. Legacy registry keys and UpgradeCode remain stable
+so upgrades can detect and remove older packages from the previous directory.
 
 The baseline is the official 7-Zip 26.05 release (https://www.7-zip.org/download.html).
 `upstream-assets.json` pins resource archive URLs and SHA-256 hashes. Update it when
@@ -16,11 +17,21 @@ readme.txt, descript.ion and all applicable licenses. x64 also builds the x86
 Explorer extension as 7-zip32.dll, matching the upstream x64 distribution.
 ARM64 follows the upstream ARM64 layout without that x86 extension.
 
-The MSI and setup EXE install the same payload; the portable .7z has the same
-runtime files. MSI owns installation, upgrades, rollback, shortcuts and uninstall
+The setup EXE and portable .7z contain the same runtime files. The EXE embeds an
+internal MSI which owns installation, upgrades, rollback, shortcuts and uninstall
 (the upstream Uninstall.exe is intentionally replaced by MSI's uninstall entry).
 The setup EXE embeds the MSI. Explorer context/drag-drop handlers and COM classes
 are registered declaratively, including the x86 COM view on x64.
+
+Standalone MSI files are no longer published as release assets or Windows build
+artifacts. Internal MSI and WiX debug files are created in RUNNER_TEMP only. The
+release has eight platform packages plus `update-windows.json` (nine assets).
+Updating an existing daily release also removes its two former standalone MSIs.
+
+Major upgrades ignore installer language, so English-registered products are
+detected when the Korean UI transform is active. Multiple older product records
+are removed inside the installation transaction before new files are installed;
+a failed upgrade rolls their removal back instead of leaving no installation.
 
 MSIX shell versions use `major.minor.run-number.attempt` in CI, including reruns.
 Local previews must use the latest existing CI run number and its matching run

@@ -319,7 +319,7 @@ jobs:
           [IO.File]::WriteAllText($licenseRtf, $licenseRtfText, [Text.Encoding]::ASCII)
 
           $msiName = "7zip-windows-$env:BUILD_ARCH.msi"
-          $msiPath = Join-Path $artifactDir $msiName
+          $msiPath = Join-Path $env:RUNNER_TEMP $msiName
           $payloadWxs = Join-Path $env:RUNNER_TEMP "payload.wxs"
           python Installer/generate_payload.py $artifactDir $payloadWxs
           if ($LASTEXITCODE -ne 0) { throw "Could not generate MSI payload." }
@@ -353,6 +353,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not generate the Korean language transform.' }
           & (Join-Path $env:GITHUB_WORKSPACE 'Installer\Embed-LanguageTransform.ps1') -MsiPath $msiPath -TransformPath $languageTransform
           & (Join-Path $env:GITHUB_WORKSPACE 'Installer\tests\Verify-InstallerLanguages.ps1') -MsiPath $msiPath -TransformPath $languageTransform -ModernSelfSigned $modernSelfSigned
+          if ($env:BUILD_ARCH -eq 'x64') {
+            & (Join-Path $env:GITHUB_WORKSPACE 'Installer\tests\Verify-UpgradeDetection.ps1') -MsiPath $msiPath -TransformPath $languageTransform
+          }
           Remove-Item -LiteralPath $koreanMsi
 
           & (Join-Path $env:GITHUB_WORKSPACE 'Installer\verify_windows_installer.ps1') -MsiPath $msiPath -ModernShellEnabled $modernShellEnabled -ModernSelfSigned $modernSelfSigned
@@ -536,7 +539,6 @@ jobs:
               7zip-windows-*)
                 cp "$artifact_dir/${asset_name}.7z" "release/${asset_name}.7z"
                 cp "$artifact_dir/${asset_name}.exe" "release/${asset_name}.exe"
-                cp "$artifact_dir/${asset_name}.msi" "release/${asset_name}.msi"
                 ;;
               *)
                 echo "Unexpected build artifact: $asset_name" >&2
@@ -572,10 +574,10 @@ jobs:
             const path = require("path");
             const { owner, repo } = context.repo;
             const dateTag = process.env.RELEASE_TAG;
-            const files = fs.readdirSync("release").filter((file) => file === "update-windows.json" || file.endsWith(".tar.xz") || /\.(7z|exe|msi)$/.test(file)).sort();
+            const files = fs.readdirSync("release").filter((file) => file === "update-windows.json" || file.endsWith(".tar.xz") || /\.(7z|exe)$/.test(file)).sort();
 
-            if (files.length !== 11) {
-              throw new Error(`Expected 11 release assets, found ${files.length}: ${files.join(", ")}`);
+            if (files.length !== 9) {
+              throw new Error(`Expected 9 release assets, found ${files.length}: ${files.join(", ")}`);
             }
 
             const releases = await github.paginate(github.rest.repos.listReleases, {
@@ -628,6 +630,12 @@ jobs:
               release_id: release.id,
               per_page: 100,
             });
+
+            for (const asset of existingAssets) {
+              if (/^7zip-windows-(x64|arm64)\.msi$/.test(asset.name)) {
+                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
+              }
+            }
 
             for (const file of files) {
               if (file === "update-windows.json") {

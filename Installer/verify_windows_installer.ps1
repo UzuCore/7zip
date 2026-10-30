@@ -40,7 +40,18 @@ try {
             }
         }
     }
+    foreach ($property in @('WIX_UPGRADE_DETECTED', 'WIX_DOWNGRADE_DETECTED')) {
+        $upgrade = Read-InstallerRow ("SELECT ``Language`` FROM ``Upgrade`` WHERE ``ActionProperty`` = '$property'") 1
+        if ($null -eq $upgrade -or $upgrade[0]) { throw 'Upgrade detection must include all product languages.' }
+    }
+    $directory = Read-InstallerRow 'SELECT `DefaultDir` FROM `Directory` WHERE `Directory` = ''INSTALLFOLDER''' 1
+    if ($null -eq $directory -or ($directory[0] -split '\|')[-1] -cne '7z alpha') { throw 'The default installation directory must be 7z alpha.' }
+    $initialize = Read-InstallerRow 'SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = ''InstallInitialize''' 1
+    $removeProducts = Read-InstallerRow 'SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = ''RemoveExistingProducts''' 1
     $install = Read-InstallerRow 'SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = ''InstallFiles''' 1
+    if ($null -eq $removeProducts -or [int]$removeProducts[0] -le [int]$initialize[0] -or [int]$removeProducts[0] -ge [int]$install[0]) {
+        throw 'Previous products must be removed inside the rollback transaction before installing files.'
+    }
     $remove = Read-InstallerRow 'SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = ''RemoveFiles''' 1
     foreach ($action in @('RegisterModernShell', 'UnregisterModernShell', 'RollbackModernShell')) {
         $row = Read-InstallerRow ("SELECT ``Type``,``Source``,``Target`` FROM ``CustomAction`` WHERE ``Action`` = '$action'") 3
